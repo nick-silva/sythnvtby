@@ -16,21 +16,45 @@ Third-party components
 Shipped with the web app
 ------------------------
 
-- Beetle VB (Mednafen's Virtual Boy emulator, libretro port) — GPL-2.0-or-later.
-  https://github.com/libretro/beetle-vb-libretro
+- Beetle VB (the libretro port of Mednafen's Virtual Boy emulator) — GPL-2.0-or-later.
+  https://github.com/libretro/beetle-vb-libretro — Mednafen: https://mednafen.github.io/
 - RetroArch (the libretro frontend the web core is built with) — GPL-3.0.
   https://github.com/libretro/RetroArch
-- EmulatorJS (the loader and page glue in public/data/) — GPL-3.0.
+- Emscripten runtime (compiled into the web core) — MIT. https://emscripten.org/
+- EmulatorJS (the loader, page glue and localization in public/data/) — GPL-3.0.
   https://github.com/EmulatorJS/EmulatorJS
+  Bundled with it, unchanged:
+  - nipplejs (public/data/src/vendor/nipplejs.js) — MIT.
+    https://github.com/yoannmoinet/nipplejs
+  - Socket.IO client 4.8.1 (public/data/src/vendor/socket.io.min.js) — MIT,
+    (c) 2014-2024 Guillermo Rauch. https://github.com/socketio/socket.io
+  - libunrar-js (public/data/compression/libunrar.*), an Emscripten port of RARLAB's unRAR
+    source — under the unRAR licence, which allows free use and redistribution but forbids
+    using the code to re-create the RAR compression algorithm. It is not a GPL licence; it
+    is shipped as a separate file that EmulatorJS loads only to open .rar archives.
+    https://github.com/tnikolai2/libunrar-js — https://www.rarlab.com/
+  - extract7z.js and extractzip.js (public/data/compression/) — archive extractors as
+    distributed with EmulatorJS; EmulatorJS does not document their origin.
 - JSZip — MIT or GPL-3.0 (dual licensed). https://github.com/Stuk/jszip
 - fflate — MIT. https://github.com/101arrowz/fflate
+
+Fonts (loaded from Google Fonts, not shipped)
+---------------------------------------------
+
+- Outfit — SIL Open Font License 1.1. https://fonts.google.com/specimen/Outfit
+- IBM Plex Mono — SIL Open Font License 1.1. https://github.com/IBM/plex
 
 Built into the native PC player (native/)
 -----------------------------------------
 
 - Beetle VB — GPL-2.0-or-later (as above).
 - SDL2 — zlib licence. https://www.libsdl.org/
-- miniz — MIT. https://github.com/richgel999/miniz
+- miniz 3.0.2 — MIT. https://github.com/richgel999/miniz
+- nlohmann/json 3.11.3 — MIT. https://github.com/nlohmann/json
+- stb_image — MIT or public domain (your choice). https://github.com/nothings/stb
+
+miniz, nlohmann/json and stb_image are downloaded at build time (native/cmake/Deps.cmake), not
+stored in this repository.
 
 
 Source of the bundled emulator core
