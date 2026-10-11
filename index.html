@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sythnvtby</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;560;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/theme.css" />
+  <link rel="stylesheet" href="/src/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>sythnvtby</h1>
+      <div class="controls">
+        <label class="rom-picker file-input-wrap" id="rom-picker-label" title="Load a .vb ROM. Uses your project home folder when set (Chromium); otherwise the system file picker.">
+          <span>Load ROM</span>
+          <span class="file-browse">Browse</span>
+          <span id="loaded-rom-name" class="loaded-name" aria-live="polite">No file chosen</span>
+          <input type="file" id="rom-input" accept=".vb,.bin" />
+        </label>
+        <div class="pack-load-row">
+          <label class="pack-picker file-input-wrap" id="pack-picker-label" title="Open a .vbpack. Uses your project home folder when set (Chromium); otherwise the system file picker.">
+            <span>Load pack</span>
+            <span class="file-browse">Browse</span>
+            <span id="loaded-pack-name" class="loaded-name" aria-live="polite">No file chosen</span>
+            <input type="file" id="pack-file-input" accept=".vbpack,.zip" />
+          </label>
+          <button type="button" id="last-vbpack-btn" class="last-rom-btn" style="display: none;" title="Load last vbpack again">Last pack: …</button>
+        </div>
+        <div class="display-toggle" id="display-toggle" title="Toggle layers: Monochrome (red) and Color (pack overlay) can be on together. Palette is exclusive (it replaces both).">
+          <span class="label">Display:</span>
+          <button type="button" id="btn-mono" class="active" title="The original picture on or off (F10). F9 swaps Monochrome and Color.">Monochrome</button>
+          <button type="button" id="btn-palette" title="Remap 4 VB shades to a preset palette (no core change)">Palette</button>
+          <button type="button" id="btn-color" title="The colour layer on or off. F9 swaps Monochrome and Color; F10 turns Monochrome on or off under it.">Color</button>
+        </div>
+        <div class="palette-debug" id="palette-debug" style="display: none;" title="Palette debug: see docs/reference/palette-rendering-plan.md">
+          <span class="label">Palette debug:</span>
+          <span id="palette-debug-status">—</span>
+          <button type="button" id="palette-debug-diagnostics" title="Run pipeline steps 0–3, report to console">Run diagnostics</button>
+          <button type="button" id="palette-debug-checksums" title="Log frame checksums every 100ms for 5s (cache test)">Checksums 5s</button>
+          <button type="button" id="palette-debug-log" title="Log #game structure to console">Log #game</button>
+        </div>
+        <div class="palette-preset-wrap" id="palette-preset-wrap" style="display: none;">
+          <span class="label">Preset:</span>
+          <select id="palette-preset">
+            <option value="original">Original (red)</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+            <option value="gameboy">Game Boy</option>
+            <option value="warm">Warm</option>
+          </select>
+        </div>
+        <button type="button" id="btn-screen-size" class="screen-size-btn" aria-pressed="true" title="Screen size: Fill makes the game as large as the window allows (the debug controls stay below it); 1:1 is the original 640-pixel-wide screen.">Screen: Fill</button>
+        <div class="view-mode" id="view-mode">
+          <span class="label">View:</span>
+          <select id="view-select">
+            <option value="2d">2D</option>
+            <option value="sidebyside">Side-by-side</option>
+            <option value="anaglyph">Anaglyph (red/cyan)</option>
+          </select>
+        </div>
+        <label class="pack-picker file-input-wrap">
+          <span>Color pack (optional)</span>
+          <span class="file-browse">Browse</span>
+          <span id="loaded-color-pack-name" class="loaded-name" aria-live="polite">No file chosen</span>
+          <input type="file" id="pack-input" accept=".vbcolor,.json" />
+        </label>
+        <label class="pack-picker file-input-wrap">
+          <span>Overrides (optional)</span>
+          <span class="file-browse">Browse</span>
+          <span id="loaded-overrides-name" class="loaded-name" aria-live="polite">No file chosen</span>
+          <input type="file" id="overrides-input" accept=".json" title="Position-based overrides: same tile, different color in a rectangle (see docs/design/color-pack-overrides-design.md)" />
+        </label>
+        <p class="color-hint">Color needs a VIP-exporting core. Enabling Color turns the mono underlay off by default so parallax doesn’t double with the VIP compositor; turn Monochrome back on to fill gaps. Tiles missing from the pack use a VIP-style 2bpp shade where multiple draws overlap the same pixel (see docs on limits / performance). “Palette 0 holes” is experimental.</p>
+        <button type="button" id="btn-export-pack" title="Save a .vbpack (zip) with current ROM + color pack + overrides + manifest. Uses your project home folder when set (File System Access); otherwise downloads.">Export .vbpack</button>
+        <button type="button" id="btn-colorize" disabled title="Requires a patched core that exports VIP state (frame data). When enabled: pause, capture frame + save state, open the Project tool. Use Save and Play there to return here at this frame.">Colorize!</button>
+        <button type="button" id="btn-dump-vip" disabled title="Add this frame to your vbpack (or unsaved vbpack). Requires a patched core that exports frame data. Press F8 while playing to quick-capture without the dialog.">Capture Frame</button>
+        <button type="button" id="btn-auto-capture" disabled aria-pressed="false" title="Play normally; the game pauses on any frame showing a tile no captured frame has yet — background, sprite or scaled (affine), you choose when you turn it on — outlines the new tiles, and asks you to label the capture. Best after a first manual pass. Left eye only.">Auto-capture</button>
+        <span id="auto-capture-status" class="auto-capture-status" aria-live="polite" hidden></span>
+        <button type="button" id="btn-memory" aria-pressed="false" title="Record the game's memory for a question's side (e.g. “Who is the player?” › Luigi) while you play, and see live which screen and game states hold. Recordings go to the Project tool with Colorize! and Export .vbpack.">Memory</button>
+        <button type="button" id="btn-pause" disabled aria-pressed="false" title="Pause the game to step through it frame by frame (P). Then Capture Frame or F8 saves exactly the frame on screen.">Pause</button>
+        <button type="button" id="btn-step-back" disabled title="Step back one frame (,) — Shift: 10 frames. The emulator keeps the last 3 seconds of frames while it runs.">◂ Step</button>
+        <button type="button" id="btn-step-forward" disabled title="Step forward one frame (.) — Shift: 10 frames. Pauses first if the game is running.">Step ▸</button>
+        <span id="step-status" class="auto-capture-status" aria-live="polite" hidden></span>
+        <details class="project-home-settings" id="project-home-settings" title="Folder used as the starting place for Load pack / Export .vbpack (Chromium File System Access). Last pack and Save and Play handoff are unchanged.">
+          <summary>Project home</summary>
+          <div class="project-home-body">
+            <span id="project-home-label" class="project-home-label">Not set</span>
+            <button type="button" id="btn-project-home-choose" class="last-rom-btn">Choose folder…</button>
+            <button type="button" id="btn-project-home-grant" class="last-rom-btn" hidden>Grant access</button>
+            <button type="button" id="btn-project-home-clear" class="last-rom-btn" disabled>Clear</button>
+          </div>
+          <p class="project-home-hint">Pick a folder (e.g. <code>Documents\sythnvtby</code>) once. Open/export dialogs start there when the browser supports it.</p>
+        </details>
+        <a href="tools/" class="tools-link" title="Tile extractor, frame viewer, pack editor">Tools</a>
+      </div>
+    </header>
+    <section id="memory-panel" class="memory-panel" hidden aria-label="Memory: recordings and game states"></section>
+    <main class="main">
+      <div id="game-container" class="game-container fill">
+        <div id="game"></div>
+        <div id="perf-metrics-overlay" class="perf-metrics-overlay" hidden></div>
+        <div id="splash" class="splash">
+          <img class="splash-art" src="/splash.webp" alt="sythnvtby" width="1344" height="784" />
+          <p>Load a Virtual Boy ROM (.vb) to start.</p>
+          <p class="note">Uses EmulatorJS with Beetle VB core (GPL-2.0). Monochrome play works now; color output appears when a core that exports VIP state is used.</p>
+        </div>
+      </div>
+      <div class="game-status-wrap" aria-live="polite">
+        <p id="color-pack-status" class="color-pack-status" aria-live="polite">Pack: not loaded. VIP: —</p>
+      </div>
+      <div id="color-debug-panel" class="color-debug-panel" style="display: none;" aria-label="VIP and color debug (visible when Color is on or when a frame with draw list is available)">
+        <div class="color-debug-controls">
+          <div id="color-fade-wrap" class="color-fade-wrap" title="Scale applied to core fade (1 = match mono; &lt;1 = lighter; &gt;1 = darker). Tune with game paused.">
+            <label><span class="label">Fade response:</span> <input type="range" id="color-fade-slider" min="0.5" max="2" step="0.01" value="1.34" /> <span id="color-fade-value">1.34</span></label>
+          </div>
+          <div id="color-strip-clip-wrap" class="color-strip-clip-wrap" title="Debug only: can cause horizontal banding. Leave off for normal play.">
+            <label><input type="checkbox" id="color-strip-clip" /> Clip color layer to strip (debug — leave off)</label>
+          </div>
+          <div id="color-obj-x-offset-wrap" class="color-obj-x-offset-wrap" title="Ghost test: draw OBJ (sprites) 8px left.">
+            <label><input type="checkbox" id="color-obj-x-offset" /> OBJ X offset -8 (ghost test)</label>
+          </div>
+          <div id="color-apply-offset-all-wrap" class="color-apply-offset-all-wrap" title="Debug: apply X offset to every draw.">
+            <label><input type="checkbox" id="color-apply-offset-all" /> Apply offset to all draws (debug)</label>
+          </div>
+          <div id="color-bg-x-offset-wrap" class="color-bg-x-offset-wrap" title="Animated BG ghost: offset in pixels. Try -4 (half tile) or -8. Negative = left.">
+            <label><span class="label">BG X offset (px):</span> <input type="number" id="color-bg-x-offset" min="-24" max="24" step="1" value="0" /> <span class="color-bg-x-offset-hint">(0 = none; try -4 for blimp ghost fix)</span></label>
+          </div>
+          <div id="color-deduplicate-draws-wrap" class="color-deduplicate-draws-wrap" title="Core sometimes emits same tile at same (x,y) twice; skip duplicates to reduce ghost.">
+            <label><input type="checkbox" id="color-deduplicate-draws" /> Deduplicate draws (fix ghost)</label>
+          </div>
+          <div id="color-sort-world-wrap" class="color-sort-world-wrap" title="Paint tiles in VIP world order (31 back → 0 front) instead of strip-major core list order. Uncheck to match raw list order (debug).">
+            <label><input type="checkbox" id="color-sort-world" checked /> Sort draws by world (VIP z-order)</label>
+          </div>
+          <div id="color-unpacked-mode-wrap" class="color-unpacked-mode-wrap" title="No-pack tiles: VIP mono fallback when ≥2 draws cover a pixel (geometric prepass). Alt: palette 0 transparent holes.">
+            <label><span class="label">Unpacked tiles:</span>
+              <select id="color-unpacked-mode">
+                <option value="transparent" selected>Default (overlap-based mono fallback)</option>
+                <option value="occlude_black">Palette 0 holes (experimental)</option>
+              </select>
+            </label>
+          </div>
+          <div id="perf-overlay-toggles" class="perf-overlay-toggles" title="Metrics on the game area (left). Frame Δ is time between composites.">
+            <span class="label">Perf overlay:</span>
+            <label><input type="checkbox" id="perf-overlay-frame-interval" /> Frame Δ / fps</label>
+            <label><input type="checkbox" id="perf-overlay-vip-present" /> VIP→present ms</label>
+            <label><input type="checkbox" id="perf-overlay-draw-count" /> Draw count</label>
+            <label><input type="checkbox" id="perf-overlay-override-count" /> Override count</label>
+          </div>
+          <div id="frame-savestate-wrap" class="frame-savestate-wrap">
+            <label><span class="label">Frame / Save state:</span> <select id="frame-savestate-select" title="Switch to a frame from the loaded vbpack and optionally restore its save state"></select></label>
+          </div>
+          <button type="button" id="btn-pack-coverage" title="Compare current frame's tile hashes to the loaded pack. Logs to console and updates status.">Pack coverage</button>
+          <button type="button" id="btn-color-layer-debug" title="Log draw list layer counts and offset application.">Color layer debug</button>
+          <button type="button" id="btn-duplicate-draws" title="Log duplicate or near-duplicate draws (same tile at same or nearby x,y). Use when double-draw/ghost persists.">Log duplicate draws</button>
+          <button type="button" id="btn-pixel-inspector-toggle" title="With Color on, click the color overlay; with Color off, click the game (mono) — same draw stack.">Pixel inspector: Off</button>
+          <button type="button" id="btn-pixel-inspector-clear" title="Clear inspector text.">Clear inspector</button>
+          <div id="color-pixel-inspector" class="color-pixel-inspector" aria-live="polite">
+            <div id="color-pixel-inspector-status" class="color-pixel-inspector-status">Inspector idle.</div>
+            <pre id="color-pixel-inspector-output" class="color-pixel-inspector-output">Enable pixel inspector and click the color canvas.</pre>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="capture-frame-dialog" class="capture-frame-dialog">
+    <div class="capture-frame-form">
+      <h3 class="capture-frame-title">Capture frame</h3>
+      <p class="capture-frame-hint" id="capture-frame-hint">Label this moment for vbpack browsing and RAM analysis. State and sub-state reuse your <strong>last capture</strong>; type or pick from suggestions. Skip uses an auto name (<code>State 001</code>, …).</p>
+      <datalist id="capture-state-datalist"></datalist>
+      <datalist id="capture-substate-datalist"></datalist>
+      <label class="capture-field">
+        <span>Game state (high-level)</span>
+        <input type="text" id="capture-state-name" list="capture-state-datalist" autocomplete="off" />
+      </label>
+      <label class="capture-field">
+        <span>Sub-state</span>
+        <input type="text" id="capture-substate-name" list="capture-substate-datalist" placeholder="Optional (menu row, animation, …)" autocomplete="off" />
+      </label>
+      <label class="capture-field">
+        <span>Note</span>
+        <textarea id="capture-note" rows="2" placeholder="Optional"></textarea>
+      </label>
+      <div class="capture-frame-actions">
+        <button type="button" id="capture-dialog-stop" class="btn-secondary" hidden>Stop auto-capture</button>
+        <button type="button" id="capture-dialog-skip" class="btn-secondary">Skip (defaults)</button>
+        <button type="button" id="capture-dialog-ok" class="btn-primary">Capture</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="auto-capture-kinds-dialog" class="capture-frame-dialog">
+    <form class="capture-frame-form" id="auto-capture-kinds-form">
+      <h3 class="capture-frame-title">Auto-capture</h3>
+      <p class="capture-frame-hint">What are you trying to capture? The game pauses on any frame showing a tile of these kinds that no captured frame has yet, and outlines it.</p>
+      <label class="auto-kind"><input type="checkbox" id="auto-kind-bg" value="bg" /> Background (BG) tiles</label>
+      <label class="auto-kind"><input type="checkbox" id="auto-kind-obj" value="obj" /> Sprite (OBJ) tiles</label>
+      <label class="auto-kind"><input type="checkbox" id="auto-kind-affine" value="affine" /> Scaled (Affine) tiles</label>
+      <label class="auto-kind auto-kind-all"><input type="checkbox" id="auto-kind-all" /> All of the above</label>
+      <label class="auto-kind auto-kind-gaps" title="Also stop where the colour doesn't cover the frame yet: a tile with no paint at all, or a backdrop scrolled past the part of its picture that was painted"><input type="checkbox" id="auto-kind-gaps" /> Where paint doesn't cover yet</label>
+      <div class="capture-frame-actions">
+        <button type="button" id="auto-kinds-cancel" class="btn-secondary">Cancel</button>
+        <button type="submit" id="auto-kinds-start" class="btn-primary">Start</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

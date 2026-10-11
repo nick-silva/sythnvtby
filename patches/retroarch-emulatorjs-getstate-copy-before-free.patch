@@ -1,0 +1,23 @@
+diff --git a/emscripten/emulatorjs.js b/emscripten/emulatorjs.js
+index 9c71d4d1ec..9a17d3e671 100644
+--- a/emscripten/emulatorjs.js
++++ b/emscripten/emulatorjs.js
+@@ -7,12 +7,13 @@ var LibraryEmulatorJS = {
+             console.error("Failed to save state!", state[0]);
+             throw new Error(state[0]);
+         }
+-        const size = parseInt(state[0]);
+-        const dataStart = parseInt(state[1]);
+-        const data = HEAPU8.subarray(dataStart, dataStart + size);
++        const size = parseInt(state[0], 10);
++        const dataStart = parseInt(state[1], 10);
++        const copy = new Uint8Array(size);
++        copy.set(HEAPU8.subarray(dataStart, dataStart + size));
+         _free(info);
+-        _free(data);
+-        return new Uint8Array(data);
++        _free(dataStart);
++        return copy;
+     },
+     $EmulatorJSGetMemoryData: function(key) {
+         let keyPtr = stringToNewUTF8(key);

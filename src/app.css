@@ -1,0 +1,694 @@
+/* Colors and fonts come from theme.css; --bg is the flat fill for inputs and the splash. */
+:root {
+  --bg: var(--bg0);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 0.85rem 1.25rem;
+  background: var(--surface-glass);
+  border-bottom: 1px solid var(--border);
+  min-height: 7rem;
+}
+
+.header h1 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.header h1 span {
+  color: var(--accent);
+}
+
+.controls > button {
+  appearance: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(94, 184, 168, 0.35);
+  background: var(--cyan-soft);
+  color: var(--cyan);
+  font-size: 0.85rem;
+  font-weight: 560;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, filter 0.15s ease;
+}
+
+.controls > button:hover:not(:disabled) {
+  background: rgba(94, 184, 168, 0.22);
+  border-color: rgba(94, 184, 168, 0.55);
+}
+
+.controls > button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.controls > #btn-colorize {
+  border-color: rgba(192, 57, 43, 0.45);
+  background: linear-gradient(165deg, var(--accent-dim), var(--accent));
+  color: #fff;
+}
+
+.controls > #btn-colorize:hover:not(:disabled) {
+  filter: brightness(1.08);
+  border-color: rgba(255, 180, 160, 0.5);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.pack-load-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rom-picker,
+.pack-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rom-picker span,
+.pack-picker span {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.last-rom-btn {
+  margin-left: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.last-rom-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.tools-link {
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.tools-link:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.project-home-settings {
+  font-size: 0.8rem;
+  color: var(--muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg);
+  padding: 0.25rem 0.5rem;
+  max-width: 22rem;
+}
+.project-home-settings > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--text);
+  user-select: none;
+}
+.project-home-settings > summary::-webkit-details-marker { display: none; }
+.project-home-settings[open] {
+  padding-bottom: 0.45rem;
+}
+.project-home-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+.project-home-label {
+  font-size: 0.75rem;
+  color: var(--text);
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-home-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.project-home-hint code {
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+.rom-picker input,
+.pack-picker input {
+  font-size: 0.875rem;
+}
+
+/* Hide native "No file chosen" / filename: overlay invisible file input, show our label instead */
+.file-input-wrap {
+  position: relative;
+}
+.file-input-wrap input[type=file] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.file-browse {
+  font-size: 0.8125rem;
+  color: var(--cyan);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.file-browse:hover {
+  color: #8fd4c8;
+}
+
+.loaded-name {
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin-left: 0.25rem;
+  min-width: 1ch;
+}
+
+.frame-savestate-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.frame-savestate-wrap .label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.frame-savestate-wrap select {
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text);
+  min-width: 10rem;
+}
+
+.display-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.display-toggle .label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.display-toggle button {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.875rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.display-toggle button:hover {
+  background: var(--surface-2);
+}
+
+.display-toggle button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.view-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.palette-debug {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.palette-debug .label {
+  color: var(--muted);
+}
+
+#palette-debug-status {
+  min-width: 12rem;
+}
+
+.palette-debug button {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.7rem;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.palette-debug button:hover {
+  color: var(--text);
+}
+
+.palette-preset-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.palette-preset-wrap .label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.palette-preset-wrap select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.875rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+
+.view-mode .label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.view-mode select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.875rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+
+.color-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.color-pack-status {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+}
+
+.color-debug-panel {
+  width: 100%;
+  max-width: 640px;
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+}
+
+.color-debug-panel .color-pack-status {
+  margin-top: 0;
+}
+
+.color-debug-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.color-debug-controls .label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+#color-bg-x-offset {
+  width: 3.5rem;
+  padding: 0.25rem 0.35rem;
+  font-size: 0.875rem;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.color-bg-x-offset-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-left: 0.25rem;
+}
+
+.game-container {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  min-height: 480px;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Screen: Fill — shaped like the Virtual Boy picture (384×224) and as wide as the page allows,
+   but never taller than the window, so the whole screen stays in view. The emulator's control bar
+   shows over its bottom edge on hover. 1:1 is the 640×480 box above. */
+.game-container.fill {
+  max-width: none;
+  width: min(100%, calc((100vh - 2rem) * 384 / 224));
+  aspect-ratio: 384 / 224;
+  min-height: 0;
+}
+.game-container.fill #game {
+  min-height: 0;
+}
+.screen-size-btn[aria-pressed='true'] {
+  color: var(--cyan, #5eb8a8);
+  border-color: var(--cyan, #5eb8a8);
+}
+
+.perf-metrics-overlay {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  z-index: 5;
+  pointer-events: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: #d8ffc8;
+  text-shadow: 0 0 3px #000, 0 1px 2px #000;
+  white-space: pre-line;
+  max-width: 19rem;
+}
+
+.perf-overlay-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  width: 100%;
+  font-size: 0.8125rem;
+}
+
+.perf-overlay-toggles > .label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.perf-overlay-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.color-pixel-inspector {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0.5rem;
+}
+
+.color-pixel-inspector-status {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.color-pixel-inspector-output {
+  margin: 0;
+  max-height: 13rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #ddd;
+}
+
+#btn-pixel-inspector-toggle.active {
+  background: #2f6f3d;
+  border-color: #3f8f53;
+  color: #fff;
+}
+
+.game-status-wrap {
+  width: 100%;
+  max-width: 640px;
+  margin-top: 0.5rem;
+}
+
+.game-status-wrap .color-pack-status {
+  margin: 0;
+}
+
+.game-container #game {
+  position: relative;
+}
+
+/* Monochrome off: hide the emulator's picture, never its controls (menu bar, popups sit at
+   z-index 9999, above the color canvas). The canvas keeps rendering, so frame reads still work. */
+.game-container #game.mono-hidden .ejs_canvas {
+  opacity: 0;
+}
+
+.game-container .color-output {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.game-container #game {
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+}
+
+.splash {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 2rem;
+  background: var(--bg);
+  pointer-events: none;
+}
+
+.splash-art {
+  width: min(100%, 768px);
+  height: auto;
+  margin-bottom: 1.25rem;
+}
+
+.splash.hidden {
+  display: none;
+}
+
+.splash p {
+  margin: 0 0 0.5rem 0;
+  color: var(--text);
+}
+
+.splash .note {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Capture Frame modal */
+.capture-frame-dialog {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  max-width: 28rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.capture-frame-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* Auto-capture: keep the game (and the outlined new tiles) visible behind the dialog. */
+.capture-frame-dialog.auto {
+  margin: auto 1.25rem 1.25rem auto;
+}
+.capture-frame-dialog.auto::backdrop {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+#btn-auto-capture.active {
+  color: #ff7ce4;
+  border-color: #ff00d0;
+  background: rgba(255, 0, 208, 0.12);
+}
+#btn-pause.active {
+  color: #ffd27c;
+  border-color: #f0b429;
+  background: rgba(240, 180, 41, 0.12);
+}
+#step-status {
+  color: #ffd27c;
+}
+.auto-capture-status {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: #ff9ce9;
+  white-space: nowrap;
+}
+
+.capture-frame-form {
+  padding: 1rem 1.25rem;
+  margin: 0;
+}
+
+.capture-frame-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.capture-frame-hint {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.capture-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.capture-field input,
+.capture-field textarea {
+  padding: 0.45rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.auto-kind {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.auto-kind-all,
+.auto-kind-gaps {
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border, #444);
+}
+
+.capture-frame-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.capture-frame-actions .btn-primary,
+.capture-frame-actions .btn-secondary {
+  padding: 0.45rem 0.85rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.capture-frame-actions .btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent-dim);
+}
+
+.capture-frame-actions .btn-secondary {
+  background: transparent;
+  color: var(--text);
+}
+
+/* Memory panel (src/memory-panel.js): recording for questions, and game states live. */
+.memory-panel { display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border, #333); font-size: 0.8rem; }
+.memory-panel[hidden] { display: none; }
+.memory-controls, .memory-live { display: flex; flex-direction: column; gap: 0.3rem; min-width: 16rem; }
+.memory-record-row, .memory-sides { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.memory-sides .is-picked { outline: 2px solid currentColor; }
+.memory-sides .is-recording, .memory-recording { color: #e05555; }
+.memory-live h4 { margin: 0; font-size: 0.8rem; }
+.memory-live p { margin: 0; }
+.memory-state { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.memory-state.holds > span:first-child { color: #5eb8a8; }
+#memory-seconds { width: 3.5rem; }

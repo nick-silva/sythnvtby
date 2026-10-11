@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sythnvtby — SpriteStudio</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;560;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/theme.css" />
+  <style>
+    :root {
+      --bg: var(--bg0);
+      --panel: var(--surface-glass);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.4rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      flex-wrap: wrap;
+    }
+    .brand { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }
+    .brand-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .app-nav { display: flex; gap: 0.25rem; }
+    .app-nav a {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 0.25rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface-2);
+    }
+    .app-nav a:hover { color: var(--text); border-color: var(--border-strong); }
+    .brand span { color: var(--accent); }
+    .header-tools {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .header-tools label { display: inline-flex; align-items: center; gap: 0.3rem; }
+    .pack-name { font-family: var(--font-mono); color: var(--text); }
+
+    button, select, input[type='number'] {
+      font: inherit;
+      font-size: 0.75rem;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 0.25rem 0.5rem;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { border-color: var(--border-strong); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.primary { background: var(--accent-soft); border-color: var(--accent-dim); color: var(--accent-text); }
+
+    .layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr) 260px;
+      min-height: 0;
+    }
+    .rail {
+      overflow-y: auto;
+      padding: 0.6rem;
+      background: var(--bg1);
+    }
+    .rail-left { border-right: 1px solid var(--border); }
+    .rail-right { border-left: 1px solid var(--border); }
+    .rail h2 {
+      margin: 0 0 0.4rem;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .rail h2 + h2 { margin-top: 0.9rem; }
+    .rail > :not(h2) + h2 { margin-top: 1rem; }
+
+    .sprite-row {
+      display: block;
+      width: 100%;
+      text-align: left;
+      margin-bottom: 0.25rem;
+      padding: 0.35rem 0.45rem;
+      background: var(--surface);
+      border-radius: 6px;
+    }
+    .sprite-row.active { border-color: var(--cyan); background: var(--cyan-soft); }
+    .sprite-row .name { display: block; font-weight: 560; }
+    .sprite-row .meta { display: block; font-size: 0.65rem; color: var(--muted); font-family: var(--font-mono); }
+
+    /* Quick search over the group lists (tools/sprite-studio.js, src/group-search.js): stays at the
+       top while the lists scroll under it. */
+    .group-search {
+      position: sticky;
+      top: -0.6rem;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin: -0.6rem -0.2rem 0.6rem;
+      padding: 0.6rem 0.2rem 0.45rem;
+      background: var(--bg1);
+      border-bottom: 1px solid var(--border);
+    }
+    #group-search {
+      flex: 1;
+      min-width: 0;
+      padding: 0.35rem 0.5rem;
+      font: inherit;
+      font-size: 0.78rem;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    #group-search:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan-soft); }
+    #group-search-count { font-size: 0.62rem; font-family: var(--font-mono); white-space: nowrap; }
+    .sprite-row mark { background: var(--cyan-soft); color: inherit; border-radius: 2px; }
+
+    /* Folders in the group lists (tools/sprite-studio.js, src/group-folders.js) */
+    .folder-new {
+      display: block;
+      margin: 0 0 0.35rem auto;
+      padding: 0.12rem 0.45rem;
+      font-size: 0.62rem;
+    }
+    .folder { margin-bottom: 0.25rem; }
+    .folder > summary {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.3rem;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      list-style: revert;
+    }
+    .folder > summary:hover { background: var(--surface); }
+    .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .folder-count { font-size: 0.6rem; color: var(--muted); font-family: var(--font-mono); }
+    .folder-action {
+      padding: 0 0.25rem;
+      font-size: 0.62rem;
+      line-height: 1.3;
+      opacity: 0;
+    }
+    .folder > summary:hover .folder-action,
+    .folder-action:focus-visible { opacity: 1; }
+    .folder-body { padding-left: 0.7rem; border-left: 1px solid var(--border); margin-left: 0.35rem; }
+    .drop-target { outline: 2px dashed var(--cyan); outline-offset: 1px; border-radius: 5px; }
+    .folder-picker { display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: var(--muted); margin-bottom: 0.45rem; }
+    .folder-picker select { flex: 1; min-width: 0; }
+
+    /* Layer art panel in the details (tools/sprite-studio.js, src/layer-art.js) */
+    .layer-art-panel { margin: 0.2rem 0 0.6rem; padding: 0.45rem; border: 1px solid var(--border); border-radius: 6px; }
+    .layer-art-panel h3 { margin: 0 0 0.3rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cyan); }
+    .layer-art-panel p { margin: 0 0 0.4rem; font-size: 0.66rem; line-height: 1.35; }
+    .layer-art-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .layer-art-actions button { font-size: 0.64rem; padding: 0.15rem 0.4rem; }
+
+    .stage {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+    .stage-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .stage-toolbar label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+    .canvas-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      padding: 0.6rem;
+      background: #0d0d10;
+    }
+    #stage-canvas {
+      image-rendering: pixelated;
+      max-width: 100%;
+      max-height: 100%;
+      background: #111;
+      border: 1px solid var(--border);
+    }
+
+    .filmstrip {
+      border-top: 1px solid var(--border);
+      background: var(--bg1);
+      padding: 0.45rem 0.6rem;
+    }
+    .filmstrip-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .filmstrip-controls input[type='range'] { flex: 1; min-width: 80px; accent-color: var(--cyan); }
+    .filmstrip-controls input[type='number'] { width: 4rem; cursor: text; }
+    .strip {
+      display: flex;
+      gap: 0.4rem;
+      overflow-x: auto;
+      padding-bottom: 0.2rem;
+      min-height: 4.5rem;
+    }
+    .pose-card {
+      flex: 0 0 auto;
+      padding: 0.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .pose-card.active { border-color: var(--cyan); background: var(--cyan-soft); }
+    .pose-card canvas { display: block; image-rendering: pixelated; background: #0d0d10; border-radius: 3px; }
+    .pose-card .label {
+      display: block;
+      margin-top: 0.2rem;
+      font-size: 0.6rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      max-width: 7rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pose-card.active .label { color: var(--text); }
+    .pose-card { position: relative; }
+    .pose-card .pose-delete {
+      position: absolute;
+      top: 0.1rem;
+      right: 0.1rem;
+      width: 1.1rem;
+      height: 1.1rem;
+      padding: 0;
+      line-height: 1;
+      font-size: 0.8rem;
+      border-radius: 50%;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      opacity: 0;
+    }
+    .pose-card:hover .pose-delete,
+    .pose-card.active .pose-delete,
+    .pose-card .pose-delete:focus-visible { opacity: 1; }
+    .pose-card .pose-delete:hover { background: var(--accent); border-color: var(--accent); color: var(--text); }
+
+    /* The stage row: canvas, then the paint tools docked on its right. The top toolbar keeps
+       view-wide settings; everything that changes pixels lives here. */
+    .stage-body { flex: 1; display: flex; min-height: 0; }
+    .stage-body .canvas-wrap { flex: 1; min-width: 0; }
+    .tool-rail {
+      flex: 0 0 5.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      padding: 0.5rem 0.4rem;
+      border-left: 1px solid var(--border);
+      background: var(--bg1);
+      overflow-y: auto;
+      font-size: 0.66rem;
+    }
+    .tool-buttons { display: flex; flex-direction: column; gap: 0.2rem; }
+    .tool-buttons button {
+      display: grid;
+      grid-template-columns: 1.1rem 1fr auto;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.3rem 0.35rem;
+      text-align: left;
+      font-size: 0.68rem;
+    }
+    .tool-buttons .glyph { font-size: 0.9rem; line-height: 1; text-align: center; }
+    .tool-buttons kbd {
+      font-family: var(--font-mono);
+      font-size: 0.56rem;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0 0.2rem;
+    }
+    .tool-buttons button.active { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-soft); }
+    .tool-buttons button.active kbd { color: var(--cyan); border-color: var(--cyan); }
+    .tool-option { display: flex; align-items: center; gap: 0.3rem; color: var(--muted); cursor: pointer; }
+    .tool-colour input[type='color'] {
+      display: block;
+      width: 100%;
+      height: 2.2rem;
+      padding: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: 5px;
+      background: var(--surface-2);
+      cursor: pointer;
+    }
+    .tool-section-label {
+      font-size: 0.58rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: -0.2rem;
+    }
+    .tool-rail #palette .empty { font-size: 0.6rem; line-height: 1.3; }
+    .tool-rail .swatches { gap: 0.2rem; }
+    .tool-actions { margin-top: auto; display: flex; flex-direction: column; gap: 0.2rem; }
+    .tool-actions button { font-size: 0.66rem; padding: 0.25rem; }
+    #stage-canvas.painting { cursor: crosshair; }
+    /* Touch-up mode (src/touch-up.js): amber everywhere, so it is never mistaken for tile paint. */
+    .paint-on { display: flex; flex-direction: column; gap: 0.2rem; }
+    .paint-on[hidden] { display: none; }
+    .paint-on button { font-size: 0.66rem; padding: 0.2rem 0.3rem; display: flex; justify-content: space-between; align-items: center; }
+    .paint-on button kbd { font-family: var(--font-mono); font-size: 0.56rem; color: var(--muted); border: 1px solid var(--border); border-radius: 3px; padding: 0 0.2rem; }
+    .paint-on button.active { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-soft); }
+    .paint-on #btn-paint-touchup.active { color: #f0b429; border-color: #f0b429; background: rgba(240, 180, 41, 0.14); }
+    .canvas-wrap { position: relative; }
+    /* Pick's answer: what colours the pixel, or why nothing does. Gone at the next click. */
+    .explain-bubble {
+      position: absolute; z-index: 3; max-width: 22rem; padding: 0.45rem 0.6rem; border-radius: 6px;
+      background: var(--surface, #1b1b22); border: 1px solid var(--border, #333); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+      font-size: 0.74rem; line-height: 1.4;
+    }
+    .explain-bubble[hidden] { display: none; }
+    .explain-bubble p { margin: 0; }
+    .explain-bubble.is-uncoloured > p:first-child { color: #f0b429; }
+    .explain-bubble .explain-why { margin-top: 0.25rem; color: var(--muted, #999); }
+    .explain-bubble button { margin-top: 0.35rem; }
+    .canvas-wrap.touch-up-mode #stage-canvas { outline: 3px solid #f0b429; outline-offset: 2px; }
+    .canvas-wrap.touch-up-mode #stage-canvas.painting { cursor: cell; }
+    .touch-up-badge {
+      position: absolute; top: 0.4rem; left: 0.5rem; z-index: 2; pointer-events: none;
+      padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.04em;
+      background: #f0b429; color: #1a1300;
+    }
+    /* A character's all-poses picture: strokes show on every pose, so the badge says it loudly. */
+    .touch-up-badge.all-poses { background: #ff6b3d; color: #1a0700; box-shadow: 0 0 0 2px rgba(255, 107, 61, 0.35); }
+    .touch-up-panel { margin: 0.2rem 0 0.6rem; padding: 0.45rem; border: 1px solid rgba(240, 180, 41, 0.6); border-radius: 6px; }
+    /* Recovered pictures (src/recovery.js): set aside instead of saved or drawn in the wrong place. */
+    .recovered-pictures { margin-top: 0.6rem; padding-top: 0.45rem; border-top: 1px dashed rgba(255, 107, 61, 0.6); }
+    .recovered-pictures h4 { margin: 0 0 0.25rem; font-size: 0.72rem; color: #ff8f6b; }
+    .recovered-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.3rem 0; }
+    .recovered-row img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
+    .recovered-label { flex: 1 1 100%; font-size: 0.66rem; color: var(--muted); }
+    .recovered-row button { font-size: 0.66rem; padding: 0.12rem 0.4rem; }
+    .touch-up-panel h3 { margin: 0 0 0.3rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: #f0b429; }
+    .touch-up-panel p { margin: 0 0 0.4rem; font-size: 0.66rem; line-height: 1.35; }
+
+    .tracks { margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.45rem; }
+    .section-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.62rem; color: var(--muted); }
+    .timeline {
+      display: flex;
+      gap: 2px;
+      min-height: 2.2rem;
+      align-items: stretch;
+      overflow-x: auto;
+      padding-bottom: 0.2rem;
+    }
+    .timeline-step {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0.25rem 0.3rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.6rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .timeline-step.active { border-color: var(--cyan); background: var(--cyan-soft); color: var(--text); }
+    .timeline-step .hold { color: var(--focus); }
+    .timeline-step button {
+      font-size: 0.6rem;
+      padding: 0 0.25rem;
+      margin-left: 0.2rem;
+      border-radius: 3px;
+    }
+    .timeline-step .step-name { overflow: hidden; text-overflow: ellipsis; }
+    .timeline-step .hold { display: flex; align-items: center; gap: 0.1rem; margin-top: 0.15rem; width: 100%; }
+    /* Delete sits at the far edge, away from where you click to select a step. */
+    .timeline-step .hold .step-delete { margin-left: auto; }
+    .timeline-step .step-hold {
+      width: 2.6rem;
+      padding: 0.05rem 0.2rem;
+      font-size: 0.62rem;
+      cursor: text;
+    }
+    .timeline-step .step-mirror.active { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-soft); }
+    .timeline-empty { font-size: 0.68rem; color: var(--muted); padding: 0.4rem 0; }
+
+    .swatches { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    .swatch {
+      width: 1.4rem;
+      height: 1.4rem;
+      border-radius: 4px;
+      border: 1px solid var(--border-strong);
+      cursor: pointer;
+      padding: 0;
+    }
+    .swatch.active { outline: 2px solid var(--cyan); outline-offset: 1px; }
+    .reference-controls { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.68rem; color: var(--muted); }
+    .reference-controls label { display: flex; align-items: center; gap: 0.35rem; }
+    .reference-controls input[type='range'] { flex: 1; accent-color: var(--cyan); }
+    .reference-controls input[type='file'] { font-size: 0.62rem; }
+
+    .detail dl { margin: 0; font-size: 0.7rem; }
+    .detail dt { color: var(--muted); text-transform: uppercase; font-size: 0.62rem; letter-spacing: 0.06em; margin-top: 0.5rem; }
+    .detail dd { margin: 0.1rem 0 0; font-family: var(--font-mono); word-break: break-all; }
+    .warn { color: var(--focus); }
+
+    .statusbar {
+      padding: 0.3rem 0.75rem;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .empty { color: var(--muted); font-size: 0.72rem; }
+    /* Save progress — same window as the Project tool (tools/shared/save-progress-ui.js). */
+    #save-progress-dialog,
+    #clear-paint-dialog {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0;
+      background: var(--surface);
+      color: var(--text);
+      max-width: min(96vw, 24rem);
+    }
+    #save-progress-dialog::backdrop,
+    #clear-paint-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+    #save-progress-dialog form,
+    #clear-paint-dialog form {
+      padding: 0.65rem 0.75rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    #save-progress-dialog h2,
+    #clear-paint-dialog h2 { margin: 0; font-size: 0.85rem; font-weight: 600; }
+    #clear-paint-dialog p { margin: 0; font-size: 0.74rem; line-height: 1.4; }
+    #clear-paint-shared { margin: 0; padding-left: 1.1rem; font-size: 0.7rem; color: var(--muted); }
+    .clear-paint-actions { display: flex; flex-direction: column; gap: 0.35rem; }
+    .clear-paint-actions button { text-align: left; }
+    .save-progress-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .save-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--accent));
+      transition: width 0.12s linear;
+    }
+    .save-progress-now { margin: 0; font-size: 0.74rem; color: var(--text); min-height: 1.1rem; }
+    .save-progress-steps {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.18rem;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .save-progress-steps li { display: flex; gap: 0.4rem; align-items: baseline; }
+    .save-progress-steps .mark { width: 1rem; flex: none; text-align: center; }
+    .save-progress-steps .ms { margin-left: auto; font-family: var(--font-mono); font-size: 0.64rem; }
+    .save-progress-steps li.is-running { color: var(--text); }
+    .save-progress-steps li.is-done .mark { color: var(--cyan); }
+    .save-progress-steps li.is-failed { color: var(--accent-warm); }
+    .save-progress-dialog-actions { display: flex; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand-row">
+      <div class="brand">sythnvtby — SpriteStudio</div>
+      <nav class="app-nav" aria-label="Pages">
+        <a href="/" id="nav-emulator">Emulator</a>
+        <a href="/tools/project.html" id="nav-project">Project tool</a>
+        <a href="/tools/" id="nav-tools">All tools</a>
+      </nav>
+    </div>
+    <div class="header-tools">
+      <button type="button" id="btn-open" class="primary">Open .vbpack…</button>
+      <button type="button" id="btn-save" disabled title="Write your changes back to the .vbpack you are working on (the one the Project tool saves to)">Save</button>
+      <button type="button" id="btn-save-as" disabled title="Choose a file to save to; Save writes that file from then on">Save as…</button>
+      <input type="file" id="file-input" accept=".vbpack,.zip" hidden />
+      <span class="pack-name" id="pack-name">no pack</span>
+      <label>Eye
+        <select id="eye-select">
+          <option value="0" selected>Left</option>
+          <option value="1">Right</option>
+        </select>
+      </label>
+      <label title="Brightens unpainted tiles only. At 1 they show in the same greys a tile's paint starts from, so the first stroke changes only the pixel you paint.">Brightness
+        <input type="number" id="brightness" min="0.5" max="3" step="0.05" value="1" />
+      </label>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="rail rail-left">
+      <div class="group-search">
+        <input type="search" id="group-search" placeholder="Search groups…" autocomplete="off" spellcheck="false"
+          aria-label="Search groups by name or folder" title="Filters as you type: every word must appear in a group's name or folder. Enter selects the first match, Esc clears. Ctrl+K jumps here." />
+        <span id="group-search-count" class="muted" aria-live="polite"></span>
+      </div>
+      <h2>Sprites</h2>
+      <div id="sprite-list"><p class="empty">Open a .vbpack to list its sprite groups.</p></div>
+      <h2>Other groups</h2>
+      <div id="other-list"><p class="empty">—</p></div>
+    </aside>
+
+    <section class="stage">
+      <div class="stage-toolbar">
+        <label><input type="checkbox" id="toggle-background" /> Background</label>
+        <label title="Use one frame's background for every pose, so the scene does not jump as the animation plays"><input type="checkbox" id="toggle-pin-background" /> Pin bg</label>
+        <label><input type="checkbox" id="toggle-outline" checked /> Outline</label>
+        <label><input type="checkbox" id="toggle-zoom" checked /> Zoom</label>
+        <label title="For a repeating background pattern, work on one copy of it; the other copies stay visible, faint, around it. Paint still goes to every copy."><input type="checkbox" id="toggle-one-set" checked /> One set</label>
+        <button type="button" id="btn-fit" title="Fit the view again. Mouse wheel zooms; middle-drag or Alt+drag pans.">Fit</button>
+        <label title="Ghost other poses over this one, to line paint up between them"><input type="checkbox" id="toggle-onion" /> Onion</label>
+        <select id="onion-pose" title="Which pose to ghost: the previous and next (behind this one), or one pose of your choice (on top, lined up on its anchor tile)" aria-label="Onion skin pose">
+          <option value="">Previous &amp; next</option>
+        </select>
+        <label title="Onion skin opacity">Opacity <input type="range" id="onion-alpha" min="0.05" max="1" step="0.05" value="0.35" aria-label="Onion skin opacity" /></label>
+        <label title="Tiles with no paint show in red, as in the Project tool (the game shows them as the original picture). Pixels of painted tiles still on a starting grey are tinted red: the game shows that grey. Hover one to see which."><input type="checkbox" id="toggle-unpainted" checked /> Show unpainted</label>
+        <label title="While you paint a group, show only its own paint on its tiles — not colours another group (or the shared pack) gives the same tile patterns in the game. Unpainted tiles look unpainted. Turn off to see what the game shows."><input type="checkbox" id="toggle-own-paint" checked /> Only this group's paint</label>
+        <label id="base-tiles-label" hidden title="A scaled (affine) group: show its tiles unscaled, as they sit in the game's background map, and paint them there. Paint is per tile pattern, so every scaled copy follows."><input type="checkbox" id="toggle-base-tiles" /> Base tiles</label>
+        <label title="Colour behind the sprite where the scene is not drawn — a loud colour makes dark sprite edges obvious">Behind
+          <input type="color" id="stage-bg-color" value="#ff00aa" />
+        </label>
+        <span class="flip-group" title="Flip what you see. The pose, its tiles and your paint keep the orientation they were captured in, so the game still draws them correctly.">
+          Flip
+          <button type="button" id="btn-flip-x" aria-pressed="false" title="Flip the sprite view left ↔ right">↔</button>
+          <button type="button" id="btn-flip-y" aria-pressed="false" title="Flip the sprite view top ↕ bottom">↕</button>
+          <span class="muted">ref</span>
+          <button type="button" id="btn-flip-ref-x" aria-pressed="false" title="Flip the reference image left ↔ right">↔</button>
+          <button type="button" id="btn-flip-ref-y" aria-pressed="false" title="Flip the reference image top ↕ bottom">↕</button>
+        </span>
+        <span id="stage-note"></span>
+      </div>
+      <div class="stage-body">
+        <div class="canvas-wrap" id="canvas-wrap">
+          <span class="touch-up-badge" id="touch-up-badge" hidden>OVERPAINT · pinned to this layer</span>
+          <canvas id="stage-canvas" width="384" height="224"></canvas>
+          <div class="explain-bubble" id="explain-bubble" role="status" hidden></div>
+        </div>
+        <aside class="tool-rail" aria-label="Paint tools">
+          <div class="tool-buttons" role="group" aria-label="Tool">
+            <button type="button" id="btn-tool-none" class="active" title="Look — select and inspect, no painting (V)"><span class="glyph" aria-hidden="true">⌖</span>Look<kbd>V</kbd></button>
+            <button type="button" id="btn-tool-brush" title="Brush — paint one pixel at a time (B)"><span class="glyph" aria-hidden="true">✎</span>Brush<kbd>B</kbd></button>
+            <button type="button" id="btn-tool-erase" title="Eraser — take paint off the pixels you drag over, so the game's own picture shows there again (on an overpaint, the layer beneath). A tile with nothing left counts as unpainted. (E)"><span class="glyph" aria-hidden="true">⌫</span>Eraser<kbd>E</kbd></button>
+            <button type="button" id="btn-tool-fill" title="Fill — colour the touching pixels of the same colour (G)"><span class="glyph" aria-hidden="true">◧</span>Fill<kbd>G</kbd></button>
+            <button type="button" id="btn-tool-swap" title="Swap — click a colour, and every pixel of this group's tiles showing it takes the brush colour, across all its tiles and poses at once (S)"><span class="glyph" aria-hidden="true">⇄</span>Swap<kbd>S</kbd></button>
+            <button type="button" id="btn-tool-pick" title="Pick — take the colour under the pointer, and say what colours that pixel in the game or why nothing does (I)"><span class="glyph" aria-hidden="true">⊙</span>Pick<kbd>I</kbd></button>
+            <button type="button" id="btn-tool-clone" title="Clone — paint with whatever colour the reference holds at each pixel (C)"><span class="glyph" aria-hidden="true">⧉</span>Clone<kbd>C</kbd></button>
+          </div>
+          <div class="paint-on" id="paint-on" role="group" aria-label="Paint on" title="Where brush strokes go. Tiles: the tile's colours, shared by every copy of it. Overpaint: a picture pinned to this layer, over the tiles — blank and transparent pixels too — shown wherever the layer is on screen.">
+            <div class="tool-section-label">Paint on</div>
+            <button type="button" id="btn-paint-tiles" class="active" aria-pressed="true">Tiles</button>
+            <button type="button" id="btn-paint-touchup" aria-pressed="false">Overpaint<kbd>T</kbd></button>
+            <label class="tool-option" title="Show the group's overpaint on the stage and in the scene"><input type="checkbox" id="toggle-touchup" checked /> Show overpaint</label>
+          </div>
+          <label class="tool-option" id="fill-options" hidden title="On: the fill spreads into neighbouring tiles of this pose or region. Off: it stays inside the one 8×8 tile you click, like the Project tool's default.">
+            <input type="checkbox" id="toggle-fill-across" checked /> Across tiles
+          </label>
+          <label class="tool-option" title="Brush size for overpaint (tile paint is always 1 px)">
+            Size
+            <select id="brush-size" aria-label="Brush size">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="4">4</option>
+              <option value="8">8</option>
+              <option value="16">16</option>
+            </select>
+          </label>
+          <div class="tool-colour">
+            <input type="color" id="paint-color" value="#e05050" aria-label="Paint colour" title="Paint colour" />
+          </div>
+          <div class="tool-section-label">Palette</div>
+          <div id="palette"><p class="empty">Painted colours show up here.</p></div>
+          <div class="tool-actions">
+            <button type="button" id="btn-undo" disabled title="Undo the last stroke (Ctrl+Z)">Undo</button>
+            <button type="button" id="btn-redo" disabled title="Redo what was undone (Ctrl+Shift+Z or Ctrl+Y)">Redo</button>
+            <button type="button" id="btn-clear-paint" title="Throw away the colours painted on this pose's tiles and start it over: just the tiles no other pose uses, or every tile it shows">Clear…</button>
+          </div>
+        </aside>
+      </div>
+      <div class="filmstrip">
+        <div class="filmstrip-controls">
+          <button type="button" id="btn-play" disabled>▶ Play</button>
+          <input type="range" id="pose-scrub" min="0" max="0" value="0" disabled aria-label="Scrub poses" />
+          <label>fps <input type="number" id="fps" min="1" max="30" step="1" value="6" /></label>
+          <span id="pose-counter">—</span>
+        </div>
+        <div class="strip" id="pose-strip"></div>
+
+        <div class="tracks" id="tracks-panel" hidden>
+          <div class="filmstrip-controls">
+            <span class="section-label">Animation</span>
+            <select id="track-select" aria-label="Animation track"></select>
+            <button type="button" id="btn-track-new">New…</button>
+            <button type="button" id="btn-track-rename" disabled>Rename…</button>
+            <button type="button" id="btn-track-delete" disabled>Delete</button>
+            <button type="button" id="btn-track-add-pose" disabled title="Append the pose you are viewing to this track">+ Pose</button>
+            <label title="How many VB frames the appended pose holds">hold
+              <input type="number" id="track-hold" min="1" max="600" step="1" value="6" />
+            </label>
+            <label title="Append the pose flipped left↔right — for a cycle captured facing the other way">
+              <input type="checkbox" id="track-mirror" /> mirrored
+            </label>
+            <button type="button" id="btn-track-play" disabled>▶ Play track</button>
+            <span id="track-length">—</span>
+          </div>
+          <div class="timeline" id="timeline" role="list" aria-label="Track timeline"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="rail rail-right detail">
+      <h2>Reference</h2>
+      <div class="reference-controls">
+        <div id="reference-name" class="muted">Load a pack</div>
+        <select id="reference-pick" aria-label="Which reference to use" hidden></select>
+        <label title="Show the colorized reference for this frame's game state, placed as you set it in the Project tool"><input type="checkbox" id="toggle-reference" disabled /> Show over sprite <span class="muted">(hold R)</span></label>
+        <label>Opacity <input type="range" id="reference-alpha" min="0.05" max="1" step="0.05" value="0.6" /></label>
+        <label title="Hide the reference everywhere except the tiles this group paints"><input type="checkbox" id="toggle-reference-clip" /> Only where this group paints</label>
+        <label title="Show the painted stage and the reference next to each other, sharing zoom, with a box on both so you can see how one maps onto the other"><input type="checkbox" id="toggle-side-by-side" /> Side by side</label>
+        <div id="reference-box-note" class="muted" style="font-size:0.62rem"></div>
+        <div style="display:flex;gap:0.3rem">
+          <button type="button" id="btn-reference-paste" disabled title="Paste only what the box covers, taken from where the reference-side box points">Paste into box</button>
+          <button type="button" id="btn-reference-box-reset" disabled title="Put the box back over the whole group, and aim it straight">Reset box</button>
+        </div>
+        <div id="reference-coverage" class="muted" style="font-size:0.62rem"></div>
+        <button type="button" id="btn-reference-fill" disabled title="Take the colours under this group's tiles out of the reference, once per tile pattern">Fill from reference</button>
+        <button type="button" id="btn-reference-palette" disabled title="Load the colours under this group into the palette, to paint by hand">Colours → palette</button>
+        <p class="muted" id="reference-hint" style="margin:0;font-size:0.62rem;line-height:1.35">References are imported in the Project tool: Frame ▸ Add colorized reference…</p>
+      </div>
+
+      <h2>Pose</h2>
+      <div id="pose-detail"><p class="empty">Select a sprite.</p></div>
+    </aside>
+  </div>
+
+  <div class="statusbar" id="status">Ready.</div>
+
+  <dialog id="save-progress-dialog" aria-labelledby="save-progress-title">
+    <form id="save-progress-form" method="dialog">
+      <h2 id="save-progress-title">Saving…</h2>
+      <div class="save-progress-bar" role="progressbar" aria-labelledby="save-progress-title"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="save-progress-bar">
+        <div class="save-progress-fill" id="save-progress-fill"></div>
+      </div>
+      <p class="save-progress-now" id="save-progress-now" aria-live="polite">Starting…</p>
+      <ol class="save-progress-steps" id="save-progress-steps"></ol>
+      <div class="save-progress-dialog-actions">
+        <button type="button" id="save-progress-close" hidden>Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="clear-paint-dialog" aria-labelledby="clear-paint-title">
+    <form id="clear-paint-form" method="dialog">
+      <h2 id="clear-paint-title">Clear paint</h2>
+      <p id="clear-paint-summary"></p>
+      <ul id="clear-paint-shared"></ul>
+      <div class="clear-paint-actions">
+        <button type="button" id="clear-paint-own"></button>
+        <button type="button" id="clear-paint-all"></button>
+        <button type="button" id="clear-paint-cancel">Cancel</button>
+      </div>
+      <p class="empty">Colour is stored per tile pattern, so a tile shared with another pose can only lose its colour everywhere. Undo brings it back; it is written to the pack only when you save.</p>
+    </form>
+  </dialog>
+
+  <script type="module" src="./sprite-studio.js"></script>
+</body>
+</html>

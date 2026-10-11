@@ -1,0 +1,40 @@
+# Checks every push and pull request: lint, unit tests, production build, the docs check, and
+# the browser suite on the synthetic fixture pack.
+# The other browser suites need a local ROM and real packs, so they stay local checks.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The docs check reads git history to see when covered code last changed.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Lint and unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Docs check
+        run: npm run docs:check
+      # The tools in Chrome on the synthetic fixture pack (needs no ROM); the other browser suites
+      # need local files and stay local.
+      - name: Browser tests (fixture pack)
+        run: npm run test:e2e -- s0
+      - name: Browser test report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: tests/e2e/.out/report.md
+          if-no-files-found: ignore

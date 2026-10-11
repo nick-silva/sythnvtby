@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory analysis — sythnvtby</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <link rel="stylesheet" href="/src/app.css" />
+  <style>
+    body { margin: 0; padding: 1rem; max-width: 960px; font-family: system-ui, sans-serif; background: var(--bg, #1a1a1a); color: var(--text, #e0e0e0); }
+    a { color: #6ab0ff; }
+    .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+    #frame-list { min-width: 220px; max-height: 70vh; overflow: auto; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.5rem; background: var(--surface, #252525); }
+    #frame-list details.frame-state-group { margin-bottom: 0.65rem; border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 0.25rem 0.4rem; }
+    #frame-list summary { cursor: pointer; font-weight: 600; padding: 0.2rem 0; user-select: none; }
+    #frame-list .frame-group-children { padding: 0.25rem 0 0 0.35rem; border-left: 2px solid rgba(255,255,255,0.08); margin-left: 0.25rem; }
+    #frame-list button { display: block; width: 100%; text-align: left; margin-bottom: 0.35rem; padding: 0.4rem 0.5rem; cursor: pointer; background: transparent; color: inherit; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; }
+    #frame-list button.active { border-color: var(--accent, #c0392b); background: rgba(192, 57, 43, 0.15); }
+    #preview { flex: 1; min-width: 280px; }
+    #preview img { max-width: 100%; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12); }
+    .meta { font-size: 0.85rem; color: #aaa; margin-top: 0.75rem; white-space: pre-wrap; }
+    .toolbar { margin: 0.75rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .toolbar button, .toolbar a.btn {
+      padding: 0.45rem 0.75rem; border-radius: 4px; cursor: pointer; font: inherit;
+      border: 1px solid rgba(255,255,255,0.2); background: var(--surface, #333); color: inherit; text-decoration: none; display: inline-block;
+    }
+    .toolbar a.btn-primary { background: var(--accent, #c0392b); color: #fff; border-color: var(--accent-dim, #8e2a20); }
+  </style>
+</head>
+<body>
+  <p><a href="index.html">← Tools index</a> · <a href="/">Emulator</a></p>
+  <h1>Memory analysis (vbpack)</h1>
+  <p>Browse captured frames and run an in-browser WRAM analyzer to annotate the <code>.vbpack</code> for later game-state overrides in <a href="project.html">Project tool</a>.</p>
+
+  <div class="memory-analysis-guidance" style="margin: 0.75rem 0; padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid rgba(255,200,100,0.35); background: rgba(255,200,100,0.08); font-size: 0.9rem; line-height: 1.45;">
+    <strong>How to capture for a good analysis</strong>
+    <ol style="margin: 0.5rem 0 0 0; padding-left: 1.25rem;">
+      <li>On the <strong>emulator</strong> page, use <strong>Capture Frame</strong> while playing.</li>
+      <li>For <strong>each high-level game state</strong> you care about (title, menu, intro/blimp, in-game, pause, etc.), capture <strong>2–3 frames</strong> at different moments in that state (same <strong>State (high-level)</strong> name, optional different sub-state/note).</li>
+      <li>Two frames with the same state name let the tool find bytes that stay <strong>stable</strong> inside that state. Captures with <strong>different</strong> state names let it find bytes that <strong>differ</strong> between states (candidates for game-state overrides).</li>
+      <li>States with <strong>only one</strong> captured frame are labeled <strong>low confidence</strong>: they cannot prove intra-state stability and are excluded from the numeric comparison until you add more captures.</li>
+    </ol>
+  </div>
+
+  <div class="toolbar">
+    <label>Load .vbpack: <input type="file" id="vbpack-input" accept=".vbpack,.zip" /></label>
+    <span id="vbpack-loaded-name" title="Selected file (the control may show ‘No file chosen’ after load; that is normal)"></span>
+    <button type="button" id="btn-dl-pack" disabled>Download this pack</button>
+  </div>
+
+  <div id="status" class="meta"></div>
+
+  <div id="analysis-ui" class="meta" style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; display: none;">
+    <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; line-height: 1.45; color: #bbb;">After analysis, <strong>Apply to manifest</strong> embeds results into <code>manifest.json</code> in memory only (your original file on disk is unchanged). Then <strong>Save annotated .vbpack</strong> downloads the updated pack — <strong>load that file</strong> in the paint tool. <strong>Download this pack</strong> (toolbar above) is still the unmodified file you opened. This flow does <strong>not</strong> create <code>groups.json</code> by itself — new packs often have only <code>manifest.json</code> until you save from the Project tool. The Project tool will <strong>auto-seed</strong> <code>gameStatePools</code> from this analysis when there is no <code>groups.json</code> in the zip, then write <code>groups.json</code> on <strong>Save .vbpack</strong>.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+      <button type="button" id="btn-run-analysis" disabled>Run WRAM analysis</button>
+      <button type="button" id="btn-accept-analysis" disabled title="Merges memoryAnalysis into manifest.json inside the in-memory zip. Does not save to disk until you use Save annotated .vbpack.">Apply analysis to manifest</button>
+      <button type="button" id="btn-download-annotated" disabled title="Downloads a new .vbpack with enlarged manifest (memoryAnalysis). Use this file in the paint tool.">Save annotated .vbpack</button>
+    </div>
+    <div id="analysis-status">Load a vbpack to enable analysis.</div>
+    <div id="analysis-warnings" style="display: none; margin-top: 0.65rem; padding: 0.65rem 0.75rem; border-radius: 6px; border: 2px solid #c0392b; background: rgba(192, 57, 43, 0.18); font-size: 0.9rem;"></div>
+    <div id="analysis-summary" style="white-space: pre-wrap; margin-top: 0.5rem;"></div>
+  </div>
+
+  <div class="row" style="margin-top: 1rem;">
+    <div id="frame-list"></div>
+    <div id="preview">
+      <p id="preview-placeholder">Load a vbpack to list frames.</p>
+      <img id="preview-img" alt="Frame screenshot" style="display: none;" />
+      <div id="preview-meta" class="meta"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./memory-analysis.js"></script>
+</body>
+</html>

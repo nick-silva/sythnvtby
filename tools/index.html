@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tools — sythnvtby</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;560;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/theme.css" />
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    a { color: var(--cyan); text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+    a:hover { color: #8fd4c8; }
+
+    .page {
+      width: min(920px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 1.25rem 0 3.5rem;
+    }
+
+    /* —— header —— */
+    .top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      animation: rise 0.55s ease both;
+    }
+
+    .brand-block { min-width: 0; }
+
+    .brand {
+      margin: 0;
+      font-size: clamp(1.55rem, 3.2vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .brand span { color: var(--accent); }
+
+    .brand-sub {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      max-width: 36rem;
+      line-height: 1.45;
+    }
+
+    .emu-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.55rem 0.95rem;
+      border-radius: 6px;
+      border: 1px solid rgba(192, 57, 43, 0.45);
+      background: linear-gradient(165deg, #8e2a20, var(--accent));
+      color: #fff;
+      font: inherit;
+      font-weight: 560;
+      font-size: 0.9rem;
+      text-decoration: none;
+      transition: transform 0.18s ease, filter 0.18s ease, border-color 0.18s ease;
+    }
+    .emu-link:hover {
+      color: #fff;
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+      border-color: rgba(255, 180, 160, 0.5);
+    }
+    .emu-link:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 3px;
+    }
+    .emu-link svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+
+    /* —— sections —— */
+    .section {
+      margin-bottom: 2.25rem;
+      animation: rise 0.6s ease both;
+    }
+    .section:nth-of-type(1) { animation-delay: 0.06s; }
+    .section:nth-of-type(2) { animation-delay: 0.12s; }
+    .section:nth-of-type(3) { animation-delay: 0.18s; }
+
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+      flex-wrap: wrap;
+    }
+    .section-head h2 {
+      margin: 0;
+      font-size: 0.72rem;
+      font-weight: 560;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .section-head p {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .tool-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .tool {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.35rem 1rem;
+      align-items: center;
+      padding: 0.95rem 1.1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(34, 34, 40, 0.92), rgba(26, 26, 30, 0.85));
+      color: inherit;
+      text-decoration: none;
+      transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+    }
+    .tool:hover {
+      border-color: rgba(192, 57, 43, 0.4);
+      background: linear-gradient(135deg, rgba(42, 36, 36, 0.95), rgba(28, 28, 32, 0.9));
+      color: inherit;
+      transform: translateX(3px);
+    }
+    .tool:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .tool.primary {
+      border-color: rgba(192, 57, 43, 0.35);
+      background:
+        linear-gradient(115deg, var(--accent-soft), transparent 42%),
+        linear-gradient(135deg, rgba(38, 32, 32, 0.95), rgba(26, 26, 30, 0.9));
+    }
+    .tool.primary:hover {
+      border-color: rgba(192, 57, 43, 0.6);
+    }
+
+    .tool-title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 560;
+      letter-spacing: -0.01em;
+    }
+    .tool-title .tag {
+      display: inline-block;
+      margin-left: 0.4rem;
+      padding: 0.08rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.65rem;
+      font-weight: 560;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: 0.12em;
+      background: var(--accent-soft);
+      color: #f0a090;
+      border: 1px solid rgba(192, 57, 43, 0.35);
+    }
+    .tool-title .tag.muted-tag {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      border-color: var(--border);
+    }
+    .tool-desc {
+      margin: 0.25rem 0 0;
+      grid-column: 1;
+      font-size: 0.86rem;
+      color: var(--muted);
+      line-height: 1.4;
+      max-width: 40rem;
+    }
+    .tool-go {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+      font-size: 0.78rem;
+      font-weight: 560;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .tool:hover .tool-go { color: #e07060; }
+
+    /* —— utility panels (interaction containers) —— */
+    .util-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .util-panel {
+      padding: 1rem 1.1rem 1.15rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(34, 34, 40, 0.75);
+    }
+    .util-panel h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1rem;
+      font-weight: 560;
+    }
+    .util-panel > p {
+      margin: 0 0 0.85rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      margin-bottom: 0.65rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .field input[type="file"] {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.72rem;
+      color: var(--text);
+      max-width: 100%;
+    }
+
+    .report {
+      margin: 0.5rem 0;
+      padding: 0.55rem 0.65rem;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--border);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.75rem;
+      line-height: 1.45;
+      color: var(--text);
+      min-height: 1.2em;
+    }
+    .report:empty { display: none; }
+    .report .warnings { color: var(--focus); }
+
+    button.action {
+      appearance: none;
+      margin: 0.15rem 0 0;
+      padding: 0.4rem 0.75rem;
+      border-radius: 5px;
+      border: 1px solid rgba(94, 184, 168, 0.35);
+      background: rgba(94, 184, 168, 0.12);
+      color: var(--cyan);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 560;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    button.action:hover:not(:disabled) {
+      background: rgba(94, 184, 168, 0.22);
+      border-color: rgba(94, 184, 168, 0.55);
+    }
+    button.action:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    button.action:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .foot {
+      margin-top: 2.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+      animation: rise 0.65s ease both;
+      animation-delay: 0.22s;
+    }
+    .foot code {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.76rem;
+      color: #c4c0ba;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .tool {
+        grid-template-columns: 1fr;
+      }
+      .tool-go {
+        grid-column: 1;
+        grid-row: auto;
+        justify-self: start;
+        margin-top: 0.35rem;
+      }
+      .emu-link { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <div class="brand-block">
+        <h1 class="brand">sythnvtby</h1>
+        <p class="brand-sub">Authoring and analysis tools for color packs, frames, and game-state overrides.</p>
+      </div>
+      <a class="emu-link" href="/" title="Return to the sythnvtby emulator">
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M10 3H3.5A1.5 1.5 0 0 0 2 4.5v7A1.5 1.5 0 0 0 3.5 13H10" />
+          <path d="M7 8h7M11 5l3 3-3 3" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        Back to emulator
+      </a>
+    </header>
+
+    <section class="section" aria-labelledby="sec-authoring">
+      <div class="section-head">
+        <h2 id="sec-authoring">Authoring</h2>
+        <p>Day-to-day colorization workflow</p>
+      </div>
+      <div class="tool-list">
+        <a class="tool primary" href="project.html">
+          <p class="tool-title">Project tool <span class="tag">Main</span></p>
+          <p class="tool-desc">Load a .vbpack, isolate and name assets frame by frame, manage groups, pools and poses, Save / Save and Play.</p>
+          <span class="tool-go">Open →</span>
+        </a>
+        <a class="tool" href="/player.html">
+          <p class="tool-title">sythnvtby Player <span class="tag">New</span></p>
+          <p class="tool-desc">Play a finished game: its ROM plus a play pack (Project tool: File ▸ Export for player…). Colour or monochrome, 2D or 3D, no authoring tools.</p>
+          <span class="tool-go">Open →</span>
+        </a>
+        <a class="tool" href="sprite-studio.html">
+          <p class="tool-title">SpriteStudio <span class="tag">New</span></p>
+          <p class="tool-desc">Sprite-first: pick a sprite, flip through its poses as a filmstrip, and play them over the background they were captured on.</p>
+          <span class="tool-go">Open →</span>
+        </a>
+        <a class="tool" href="memory-analysis.html">
+          <p class="tool-title">Memory analysis</p>
+          <p class="tool-desc">Browse captures in a .vbpack and run the in-browser WRAM analyzer to annotate game-state pools.</p>
+          <span class="tool-go">Open →</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="sec-inspect">
+      <div class="section-head">
+        <h2 id="sec-inspect">Inspect</h2>
+        <p>Frame and alignment checks</p>
+      </div>
+      <div class="tool-list">
+        <a class="tool" href="viewer.html">
+          <p class="tool-title">Frame viewer</p>
+          <p class="tool-desc">Load a vbstate.json capture and review the frame with palette presets and debug helpers.</p>
+          <span class="tool-go">Open →</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="sec-utilities">
+      <div class="section-head">
+        <h2 id="sec-utilities">Utilities</h2>
+        <p>Run here — no separate page</p>
+      </div>
+      <div class="util-grid">
+        <div class="util-panel">
+          <h3>Tile extractor</h3>
+          <p>Load VIP state dump(s) (<code>vbstate.json</code>) to extract unique tiles and download a tile manifest for pack authoring.</p>
+          <label class="field">
+            VIP state dump(s)
+            <input type="file" id="dump-input" accept=".json" multiple />
+          </label>
+          <div id="extract-report" class="report"></div>
+          <button type="button" class="action" id="btn-download-manifest" disabled>Download tile manifest</button>
+        </div>
+        <div class="util-panel">
+          <h3>Pack validator</h3>
+          <p>Check a <code>.vbcolor</code> pack format and optional coverage against a VIP dump.</p>
+          <label class="field">
+            Color pack
+            <input type="file" id="pack-input" accept=".vbcolor,.json" />
+          </label>
+          <label class="field">
+            VIP dump (optional)
+            <input type="file" id="validator-dump" accept=".json" />
+          </label>
+          <div id="validator-report" class="report"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <p>
+        Prefer the in-browser analyzer on the Memory analysis page.
+        Optional CLI:
+        <a href="memory-analysis/analyze_vbpack_ram.py" download="analyze_vbpack_ram.py">Download Python WRAM analyzer</a>.
+      </p>
+      <p style="margin-top:0.65rem">
+        <a href="/">Emulator</a>
+        ·
+        <a href="project.html">Project tool</a>
+        ·
+        <a href="sprite-studio.html">SpriteStudio</a>
+        ·
+        <a href="memory-analysis.html">Memory analysis</a>
+      </p>
+    </footer>
+  </div>
+
+  <script type="module" src="./extract.js"></script>
+</body>
+</html>

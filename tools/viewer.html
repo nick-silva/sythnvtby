@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frame viewer — sythnvtby</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 0.75rem; background: #1a1a1a; color: #e0e0e0; }
+    h1 { font-size: 1.25rem; margin: 0 0 0.75rem 0; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .toolbar label { display: inline-flex; align-items: center; gap: 0.25rem; }
+    .toolbar input[type=file] { max-width: 12rem; }
+    .toolbar select { padding: 0.25rem 0.5rem; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; }
+    .frame-wrap { position: relative; display: inline-block; background: #000; border: 1px solid #444; border-radius: 4px; overflow: hidden; width: 768px; height: 448px; }
+    .frame-wrap canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; position: relative; z-index: 1; }
+    .screenshot-layer { position: absolute; left: 0; top: 0; z-index: 0; width: 100%; height: 100%; display: none; pointer-events: none; image-rendering: pixelated; image-rendering: crisp-edges; }
+    .screenshot-layer.has-screenshot { display: block; }
+    .screenshot-layer.copyable { z-index: 2; pointer-events: auto; }
+    .frame-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #111; color: #666; font-size: 0.875rem; pointer-events: none; }
+    .frame-placeholder.hidden { display: none; }
+    .display-border { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 1px solid rgba(255,200,0,0.6); pointer-events: none; box-sizing: border-box; }
+    .status { margin-top: 0.5rem; font-size: 0.8125rem; color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Frame viewer</h1>
+  <div class="toolbar">
+    <label>Load vbstate: <input type="file" id="file-input" accept=".json" /></label>
+    <label>Palette: <select id="palette-preset"></select></label>
+    <label title="When vbstate has captured GPLT + master colors, use them; uncheck to use the preset above">Use captured palettes (GPLT): <input type="checkbox" id="use-captured-palettes" checked /></label>
+    <label title="Exact = game RGB; Shaded = preserve dark/transparent structure but tint with the Palette preset (blacks/transparent same on all presets)">Captured: <select id="captured-palette-mode"><option value="shaded">Shaded (preset tint)</option><option value="exact">Exact (game colors)</option></select></label>
+    <label>Eye: <select id="eye-select" title="Left/right eye (stereo); use Left to match single-eye screenshot"><option value="0" selected>Left</option><option value="1">Right</option></select></label>
+    <label title="Filter by draw type: BG = background tiles, Affine = affine layer, OBJ = sprites">Layer: <select id="layer-select"><option value="all">All</option><option value="0">BG (tiles)</option><option value="1">Affine</option><option value="2">OBJ (sprites)</option></select></label>
+    <label>View: <select id="view-mode"><option value="render">Render</option><option value="screenshot">Screenshot</option><option value="overlay">Overlay</option></select></label>
+    <label>Overlay opacity: <input type="range" id="overlay-opacity" min="0.2" max="1" step="0.1" value="0.6" style="width: 80px;" /></label>
+    <label>Offset X: <input type="number" id="offset-x" value="0" min="-64" max="64" style="width: 3rem;" /></label>
+    <label>Offset Y: <input type="number" id="offset-y" value="0" min="-64" max="64" style="width: 3rem;" /></label>
+    <label title="Scale render from origin">Scale X: <input type="number" id="scale-x" value="1" min="0.5" max="2" step="0.01" style="width: 3.5rem;" /></label>
+    <label title="Scale render from origin">Scale Y: <input type="number" id="scale-y" value="1" min="0.5" max="2" step="0.01" style="width: 3.5rem;" /></label>
+    <label title="Origin for scale (e.g. 192,112 = center)">Origin X: <input type="number" id="origin-x" value="192" min="0" max="384" style="width: 3rem;" /></label>
+    <label title="Origin for scale">Origin Y: <input type="number" id="origin-y" value="112" min="0" max="224" style="width: 3rem;" /></label>
+    <label title="Skip drawing tiles whose top edge is above this Y (hides e.g. top green bar)">Crop top: <input type="number" id="crop-top" value="0" min="0" max="224" step="8" style="width: 3rem;" /></label>
+    <label title="Render palette level 0 as black (game background) so it matches screenshot">Black BG: <input type="checkbox" id="black-bg" /></label>
+    <label title="Fill top N pixels with black after draw">Clear top: <input type="number" id="clear-top" value="0" min="0" max="224" style="width: 3rem;" /></label>
+    <label title="Fill left N pixels with black">Clear left: <input type="number" id="clear-left" value="0" min="0" max="384" style="width: 3rem;" /></label>
+    <label title="Fill right N pixels with black">Clear right: <input type="number" id="clear-right" value="0" min="0" max="384" style="width: 3rem;" /></label>
+    <label title="Don't draw palette index 0 (VB transparent; helps layered sprites)">Transparent 0: <input type="checkbox" id="transparent-0" checked /></label>
+    <label title="Debug: force palette selector 2 to all black (e.g. top block)">Palette 2 = black (debug): <input type="checkbox" id="palette-2-black" /></label>
+    <button type="button" id="btn-export-png" title="Download current view (Render, Screenshot, or Overlay) as PNG">Export PNG</button>
+    <button type="button" id="btn-copy-image" title="Copy current view to clipboard">Copy image</button>
+  </div>
+  <div class="frame-wrap" id="frame-wrap">
+    <img id="screenshot-img" class="screenshot-layer" alt="Reference screenshot" width="384" height="224" />
+    <canvas id="canvas" width="384" height="224"></canvas>
+    <div class="frame-placeholder" id="placeholder">No frame loaded. Load a vbstate.json file to view.</div>
+    <div id="display-border" class="display-border" style="display: none;" title="384×224 nominal display area"></div>
+  </div>
+  <div class="status" id="status"></div>
+  <p style="font-size: 0.8125rem; color: #888; margin: 0.25rem 0;">If the vbstate includes a screenshot (saved from the emulator), use <strong>Overlay</strong> to compare. Adjust <strong>Offset X/Y</strong> and <strong>Scale X/Y</strong> (origin at Origin X/Y, default center 192,112) until the render lines up with the reference.</p>
+  <details class="debug-section" style="margin-top: 0.75rem;">
+    <summary style="cursor: pointer; font-size: 0.875rem; color: #888;">Debug: help describe misalignment</summary>
+    <p style="font-size: 0.8125rem; color: #666; margin: 0.5rem 0;">We assume (x,y) are pixel coordinates, origin top-left. Display is 384×224; anything past that is clipped.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0;">
+      <button type="button" id="btn-log-summary">Log draw list summary</button>
+      <button type="button" id="btn-log-alignment-sample" title="Print bands with representative Y and distance from center for alignment data gathering">Log alignment sample</button>
+      <button type="button" id="btn-toggle-border" title="Show 384×224 border">Show display border</button>
+    </div>
+    <p style="font-size: 0.8125rem; color: #666; margin: 0.5rem 0;"><strong>Click canvas</strong> → console lists draw(s) under that pixel (back-to-front). For alignment data each logged draw includes <code>y</code> and <code>distanceFromCenterY</code> (y − 112). <strong>Log alignment sample</strong> prints a band table and markdown for <code>docs/history/archive/sprite-alignment-investigation.md</code>; for each band set Offset Y until it aligns, then record the value.</p>
+    <p style="font-size: 0.75rem; color: #555; margin: 0.5rem 0;">If bounds show maxX &gt; 384 or maxY &gt; 224, some draws extend past the display; we clip to 384×224 so the right/bottom edge may be cut off.</p>
+  </details>
+  <p style="margin-top: 0.75rem; font-size: 0.8125rem; color: #666;">Drop a vbstate.json file onto the page to load it. Use the tile extractor to build a manifest; use the pack editor to create .vbcolor packs.</p>
+
+  <script type="module" src="./viewer.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "name": "colorized-vb",
+  "version": "0.1.0",
+  "description": "sythnvtby emulator — browser-first with per-game color packs and mono/color toggle",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:https": "VITE_DEV_HTTPS=1 vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "eslint . && vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "node tests/e2e/run-all.mjs",
+    "bench": "node scripts/bench/render-strategies.mjs",
+    "bench:overdraw": "node scripts/bench/overdraw.mjs",
+    "bench:worlds": "node scripts/bench/frame-worlds.mjs",
+    "docs:check": "node scripts/check-docs.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.2.0",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "playwright-core": "^1.63.0",
+    "vite": "^5.4.0",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "jszip": "^3.10.1"
+  }
+}

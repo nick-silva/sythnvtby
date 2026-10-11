@@ -1,0 +1,50 @@
+# Dependencies and build
+node_modules/
+dist/
+.vite/
+.emsdk/
+emulatorjs-build/
+
+# Browser regression output (reports, screenshots, test packs)
+tests/e2e/.out/
+
+
+# Scratch probe scripts (read-only checks run by hand)
+*.tmp.mjs
+
+# Logs
+*.log
+localhost-*.log
+
+# Local game files and authoring projects (not application source)
+*.vb
+*.vbcolor
+*.vbpack
+roms/
+/groups.json
+/overrides.json
+vbstate*.json
+
+# Core build trees (clone + patch locally; see docs/CORE_BUILD.md)
+# Local core rebuild workspace (scripts/build-core.sh): sources, emsdk, logs, previous core.
+core-build/
+core-build/RetroArch/
+core-build/beetle_vb/
+core-build/EmulatorJS/
+core-build/**/build/
+core-build/**/downloads/
+core-build/**/.cache/
+core-build/**/*.o
+core-build/**/*.a
+core-build/**/*.bc
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+__pycache__/
+*.pyc
+
+# Native (C++) build output: cmake -S native -B native/build (see native/README.md)
+native/build/

@@ -1,0 +1,350 @@
+From cf26d2c9f9e39ada38bd6380eeb60aef12f64b93 Mon Sep 17 00:00:00 2001
+From: Backup <backup@local>
+Date: Tue, 21 Apr 2026 14:54:12 -0700
+Subject: [PATCH] VIP: draw list / export hooks (emscripten core)
+
+---
+ mednafen/vb/vip.c        | 194 +++++++++++++++++++++++++++++++++++++++
+ mednafen/vb/vip_draw.inc |  58 ++++++++++++
+ 2 files changed, 252 insertions(+)
+
+diff --git a/mednafen/vb/vip.c b/mednafen/vb/vip.c
+index c7ccd42..9edbc82 100644
+--- a/mednafen/vb/vip.c
++++ b/mednafen/vb/vip.c
+@@ -26,6 +26,49 @@
+ #include "../masmem.h"
+ #include "../state_helpers.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#include <stdint.h>
++static uint32_t vip_js_frame_count = 0;
++
++#define VB_DL_MAX_CALLS 200000
++typedef struct VB_DrawCall
++{
++  uint16_t tile;    // 0..2047
++  int16_t  x;       // screen px
++  int16_t  y;       // screen px
++  uint8_t  flags;   // bit0 flipH, bit1 flipV
++  uint8_t  world;   // 0..31
++  uint8_t  eye;     // 0 = left, 1 = right (for stereo; filter to one for 2D view)
++  uint8_t  layer;   // 0 = BG, 1 = Affine, 2 = OBJ (sprites)
++  uint8_t  palette; // 0..3, palette selector (bgsc>>14 or oam>>14)
++  uint8_t  strip;   // 0..27, strip (8-row band) this draw was emitted in; for strip-clip debug
++} VB_DrawCall;
++
++static VB_DrawCall vb_draw_calls[VB_DL_MAX_CALLS];
++static uint32_t vb_draw_count = 0;
++
++static INLINE void VB_DL_Reset(void)
++{
++  vb_draw_count = 0;
++}
++
++static INLINE void VB_DL_Push(uint16_t tile, int16_t x, int16_t y, uint8_t flags, uint8_t world, uint8_t eye, uint8_t layer, uint8_t palette, uint8_t strip)
++{
++  if(vb_draw_count >= VB_DL_MAX_CALLS) return;
++  vb_draw_calls[vb_draw_count].tile = tile;
++  vb_draw_calls[vb_draw_count].x = x;
++  vb_draw_calls[vb_draw_count].y = y;
++  vb_draw_calls[vb_draw_count].flags = flags;
++  vb_draw_calls[vb_draw_count].world = world;
++  vb_draw_calls[vb_draw_count].eye = eye;
++  vb_draw_calls[vb_draw_count].layer = layer;
++  vb_draw_calls[vb_draw_count].palette = palette & 3;
++  vb_draw_calls[vb_draw_count].strip = strip;
++  vb_draw_count++;
++}
++#endif
++
+ static uint8 FB[2][2][0x6000];
+ static uint16 CHR_RAM[0x8000 / sizeof(uint16)];
+ static uint16 DRAM[0x20000 / sizeof(uint16)];
+@@ -93,6 +136,10 @@ static uint32 ColorLUT[2][256];
+ static int32 BrightnessCache[4];
+ static uint32 BrightCLUT[2][4];
+ 
++#ifdef __EMSCRIPTEN__
++static struct { const void *pGPLT; const void *pBright; const void *pBrightnessCache; } vb_js_opt_ptrs;
++#endif
++
+ static double ColorLUTNoGC[2][256][3];
+ static uint32 AnaSlowColorLUT[256][256];
+ 
+@@ -1341,6 +1388,150 @@ v810_timestamp_t MDFN_FASTCALL VIP_Update(const v810_timestamp_t timestamp)
+             {
+                DrawingActive = false;
+ 
++#ifdef __EMSCRIPTEN__
++               vip_js_frame_count++;
++               vb_js_opt_ptrs.pGPLT = GPLT;
++               vb_js_opt_ptrs.pBright = (const void *)BrightCLUT[0];
++               vb_js_opt_ptrs.pBrightnessCache = BrightnessCache;
++               // Note: EM_ASM_ macro parsing breaks on commas unless they are inside parentheses.
++               // Avoid JS object literals with commas here; build objects field-by-field.
++               EM_ASM_((function() {
++                 var g = (typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : (typeof window !== 'undefined' ? window : {})));
++                 var w = (typeof window !== 'undefined' ? window : null);
++                 // Unconditional marker so the page can verify the patched core is running.
++                 try { g.__VB_CORE_PATCH_LEVEL__ = 2; } catch (e) {}
++                 try { if (w) w.__VB_CORE_PATCH_LEVEL__ = 2; } catch (e) {}
++
++                 // Phase 1: frame tick
++                 try {
++                   var f = (w && typeof w.__VB_FRAME__ === 'function') ? w.__VB_FRAME__ : ((g && typeof g.__VB_FRAME__ === 'function') ? g.__VB_FRAME__ : null);
++                   if (f) f();
++                   else if (g && typeof g.postMessage === 'function') {
++                     var fm = {}; fm.__vb = 'frame';
++                     g.postMessage(fm);
++                   }
++                 } catch (e) {}
++
++                 // Phase 2: minimal VIP state push
++                 try {
++                   var fn = (g && typeof g.__VB_PUSH_VIP_STATE__ === 'function') ? g.__VB_PUSH_VIP_STATE__ : ((w && typeof w.__VB_PUSH_VIP_STATE__ === 'function') ? w.__VB_PUSH_VIP_STATE__ : null);
++                   if (fn) {
++                     g.__VB_VIP_STATE_AVAILABLE__ = true;
++                     g.__VB_LAST_VIP_FRAME__ = $0;
++                     // Pull real VIP buffers from WASM memory (EmulatorJS exposes module as __VB_EJS_MODULE__).
++                     var M = (w && w.__VB_EJS_MODULE__) ? w.__VB_EJS_MODULE__ : ((g && g.__VB_EJS_MODULE__) ? g.__VB_EJS_MODULE__ : ((typeof Module !== 'undefined') ? Module : (g && g.Module ? g.Module : null)));
++                     var heap = (M && M.HEAPU8) ? M.HEAPU8 : null;
++                     var st = {}; st.frameNumber = $0; st.eye = $1;
++                     if (heap) {
++                       // Pointers may arrive as signed ints; force to uint32 to avoid negative slice indexes.
++                       var pChr = ($2 >>> 0), nChr = ($3 >>> 0);
++                       var pOam = ($4 >>> 0), nOam = ($5 >>> 0);
++                       var pWin = ($6 >>> 0), nWin = ($7 >>> 0);
++                       var pDram = ($8 >>> 0), nSeg = ($9 >>> 0), segSize = ($10 >>> 0);
++                       var pCalls = ($11 >>> 0), nCalls = ($12 >>> 0), callStride = ($13 >>> 0);
++                       var pOpt = ($14 >>> 0);
++                       var pGPLT = 0, pBright = 0, pBrightnessCache = 0;
++                       if (pOpt && heap.buffer) {
++                         var dvOpt = new DataView(heap.buffer);
++                         pGPLT = dvOpt.getUint32(pOpt + 0, true) >>> 0;
++                         pBright = dvOpt.getUint32(pOpt + 4, true) >>> 0;
++                         pBrightnessCache = dvOpt.getUint32(pOpt + 8, true) >>> 0;
++                       }
++                       try { g.__VB_VIP_PTRS__ = [pChr, nChr, pOam, nOam, pWin, nWin]; } catch (e) {}
++
++                       // Pattern table: CHR_RAM, 0x8000 bytes
++                       st.patternTable = heap.slice(pChr, pChr + nChr);
++                       // OAM: DRAM + 0x1E000, 0x2000 bytes
++                       st.oam = heap.slice(pOam, pOam + nOam);
++                       // Windows: DRAM + 0x1D800, 0x400 bytes (32 windows × 32 bytes)
++                       st.windows = heap.slice(pWin, pWin + nWin);
++                       // Segments: 8KB each. We export a fixed set from DRAM base (segment index = bgmap_base).
++                       st.segments = [];
++                       if (pDram && nSeg && segSize) {
++                         var si = 0;
++                         while (si < nSeg) {
++                           var pSeg = (pDram + (si * segSize)) >>> 0;
++                           st.segments.push(heap.slice(pSeg, pSeg + segSize));
++                           si = (si + 1) | 0;
++                         }
++                       }
++
++                       // Draw list: decode C buffer of fixed-stride structs into JS objects.
++                       st.drawList = [];
++                       if (pCalls && nCalls && callStride) {
++                         var dv = new DataView(heap.buffer);
++                         var i = 0;
++                         while (i < nCalls) {
++                           var off = (pCalls + (i * callStride)) >>> 0;
++                          var tile = dv.getUint16(off + 0, true);
++                          var x0 = dv.getInt16(off + 2, true);
++                          var y0 = dv.getInt16(off + 4, true);
++                         var flags = dv.getUint8(off + 6);
++                         var world = dv.getUint8(off + 7);
++                         var eye = dv.getUint8(off + 8);
++                         var layer = dv.getUint8(off + 9);
++                         var palette = dv.getUint8(off + 10);
++                         var strip = (off + 11 < heap.length) ? dv.getUint8(off + 11) : (y0 >> 3);
++                         var call = {};
++                         call.tileIndex = tile;
++                         call.x = x0;
++                         call.y = y0;
++                         call.flipH = (flags & 1) ? true : false;
++                         call.flipV = (flags & 2) ? true : false;
++                         call.eye = eye;
++                         call.world = world;
++                         call.layer = layer;
++                         call.paletteSelector = (palette & 3);
++                         call.strip = strip;
++                         st.drawList.push(call);
++                           i = (i + 1) | 0;
++                         }
++                       }
++                       // GPLT (4 × uint16) and master colors BrightCLUT[0] (4 × uint32) for accurate palette in viewer
++                       if (pGPLT && pBright && heap.buffer) {
++                         var dv = new DataView(heap.buffer);
++                         st.gplt = [];
++                         for (var gi = 0; gi < 4; gi++) st.gplt.push(dv.getUint16(pGPLT + gi * 2, true));
++                         st.masterColors = [];
++                         for (var mi = 0; mi < 4; mi++) {
++                           var u = dv.getUint32(pBright + mi * 4, true);
++                           st.masterColors.push([(u >> 16) & 0xFF, (u >> 8) & 0xFF, u & 0xFF]);
++                         }
++                       }
++                       // BrightnessCache[4] (int32): effective 0-255 per shade; derive 0..1 for color layer fade
++                       if (pBrightnessCache && heap.buffer) {
++                         var dv = new DataView(heap.buffer);
++                         var c1 = dv.getInt32(pBrightnessCache + 4, true), c2 = dv.getInt32(pBrightnessCache + 8, true), c3 = dv.getInt32(pBrightnessCache + 12, true);
++                         st.masterBrightness = Math.max(0, Math.min(1, (c1 + c2 + c3) / (3 * 255)));
++                       }
++                       try { g.__VB_VIP_HEAP_OK__ = (st.patternTable.length === nChr && st.oam.length === nOam && st.windows.length === nWin); } catch (e) {}
++                     }
++                     fn(st);
++                   }
++                 } catch (e) {}
++
++                 // Only postMessage when we could not call fn (worker fallback). Otherwise we'd overwrite full state with minimal.
++                 if (!fn) {
++                   try {
++                     if (w && typeof w.postMessage === 'function') {
++                       var msg = {}; msg.__vb = 'vip'; msg.frameNumber = $0; msg.eye = $1;
++                       w.postMessage(msg, '*');
++                     } else if (g && typeof g.postMessage === 'function') {
++                       var msg2 = {}; msg2.__vb = 'vip'; msg2.frameNumber = $0; msg2.eye = $1;
++                       g.postMessage(msg2);
++                     }
++                   } catch (e) {}
++                 }
++               })(), (int)vip_js_frame_count, 0,
++                 (int)(uintptr_t)(const void*)CHR_RAM, (int)0x8000,
++                 (int)(uintptr_t)((const uint8_t*)DRAM + 0x1E000), (int)0x2000,
++                 (int)(uintptr_t)((const uint8_t*)DRAM + 0x1D800), (int)0x0400,
++                 (int)(uintptr_t)(const void*)DRAM, (int)16, (int)0x2000,
++                 (int)(uintptr_t)(const void*)vb_draw_calls, (int)vb_draw_count, (int)sizeof(VB_DrawCall),
++                 (int)(uintptr_t)(const void*)&vb_js_opt_ptrs
++               );
++#endif
++
+                InterruptPending |= INT_XP_END;
+                CheckIRQ();
+             }
+@@ -1412,6 +1603,9 @@ v810_timestamp_t MDFN_FASTCALL VIP_Update(const v810_timestamp_t timestamp)
+                      DrawingBlock   = 0;
+                      DrawingActive  = true;
+                      DrawingCounter = 1120 * 4;
++#ifdef __EMSCRIPTEN__
++                     VB_DL_Reset();
++#endif
+                   }
+ 
+                   GameFrameCounter = 0;
+diff --git a/mednafen/vb/vip_draw.inc b/mednafen/vb/vip_draw.inc
+index 0b6b7ca..bad2dfa 100644
+--- a/mednafen/vb/vip_draw.inc
++++ b/mednafen/vb/vip_draw.inc
+@@ -3,6 +3,11 @@
+ #define BGM_AFFINE	0x2
+ #define BGM_OBJ		0x3
+ 
++#ifdef __EMSCRIPTEN__
++// Draw list capture (implemented in vip.c; this file is included from vip.c)
++static uint8_t vb_dl_world = 0;
++#endif
++
+ 
+ static void DrawBG(uint8 *target, uint16 RealY, bool lr, uint8 bgmap_base_raw, bool overplane, uint16 overplane_char, uint32 SourceX, uint32 SourceY, uint32 scx, uint32 scy, uint16 DestX, uint16 DestY, uint16 DestWidth, uint16 DestHeight)
+ {
+@@ -66,6 +71,19 @@ static void DrawBG(uint8 *target, uint16 RealY, bool lr, uint8 bgmap_base_raw, b
+ 
+   char_sub_y = vflip_xor ^ (SourceY & 0x7);
+ 
++#ifdef __EMSCRIPTEN__
++  // Record one draw per tile: only when we're on the tile's "top" scanline in screen space for this tile.
++  // We use char_sub_y==0 and SourceX aligned to tile boundary.
++  if(char_sub_y == 0 && ((SourceX & 7) == 0))
++  {
++    uint8_t flags = 0;
++    if(bgsc & 0x2000) flags |= 1;
++    if(bgsc & 0x1000) flags |= 2;
++    const int16_t y0 = (int16_t)RealY - (int16_t)(vflip_xor);
++    VB_DL_Push((uint16_t)char_no, (int16_t)x, y0, flags, vb_dl_world, (uint8_t)lr, 0, (uint8_t)(palette_selector & 3), (uint8_t)(RealY >> 3));
++  }
++#endif
++
+   if(!(SourceX & 7) && (x + 7) <= final_x)
+   {
+    uint32 pixels = CHR16[char_no * 8 + char_sub_y];
+@@ -205,6 +223,18 @@ if(dy == 0)	/* Optimization for no rotation. */
+   char_sub_y = vflip_xor ^ ((SourceY >> 9) & 0x7);
+   char_sub_x = hflip_xor ^ ((SourceX >> 8) & 0xE);
+ 
++#ifdef __EMSCRIPTEN__
++  if(char_sub_y == 0 && char_sub_x == 0)
++  {
++    uint8_t flags = 0;
++    if(bgsc & 0x2000) flags |= 1;
++    if(bgsc & 0x1000) flags |= 2;
++    const int16_t y0 = (int16_t)RealY - (int16_t)(vflip_xor);
++    const int16_t x0 = (int16_t)x - (int16_t)(hflip_xor >> 1);
++    VB_DL_Push((uint16_t)(bgsc & 0x7FF), x0, y0, flags, vb_dl_world, (uint8_t)lr, 1, (uint8_t)((bgsc >> 14) & 3), (uint8_t)(RealY >> 3));
++  }
++#endif
++
+   pixel = (CHR16[((bgsc & 0x7FF) * 8) | char_sub_y] >> char_sub_x) & 0x3;
+ 
+   if(pixel)
+@@ -302,6 +332,23 @@ static void DrawOBJ(uint8 *fb[2], uint16 Y, bool lron[2])
+   char_no = oam_ptr[3] & 0x7FF;
+   pixels_save = CHR16[char_no * 8 + char_sub_y];
+ 
++#ifdef __EMSCRIPTEN__
++  // Record one draw per sprite tile per eye at top scanline (tile_y==0), so viewer can toggle L/R.
++  if(tile_y == 0)
++  {
++    uint8_t flags = 0;
++    if(oam_ptr[3] & 0x2000) flags |= 1;
++    if(oam_ptr[3] & 0x1000) flags |= 2;
++    for(lr = 0; lr < 2; lr++)
++    {
++     if(!(jlron[lr] & lron[lr]))
++      continue;
++     const int32 x0 = sign_x_to_s32(10, (jx + (lr ? jp : -jp)));
++     VB_DL_Push((uint16_t)char_no, (int16_t)x0, (int16_t)jy, flags, vb_dl_world, (uint8_t)lr, 2, (uint8_t)(palette_selector & 3), (uint8_t)(Y >> 3));
++    }
++  }
++#endif
++
+   for(lr = 0; lr < 2; lr++)
+   {
+    uint32 pixels;
+@@ -391,13 +438,21 @@ void VIP_DrawBlock(uint8 block_no, uint8 *fb_l, uint8 *fb_r)
+    uint8 *fb[2] = { &fb_l[y * 512], &fb_r[y * 512] };
+ 
+    if(bgm == BGM_OBJ)
++   {
++#ifdef __EMSCRIPTEN__
++    vb_dl_world = (uint8_t)world;
++#endif
+     DrawOBJ(fb, (block_no * 8) + y, lron);
++   }
+    else if(bgm == BGM_AFFINE)
+    {
+     for(lr = 0; lr < 2; lr++)
+     {
+      if(lron[lr])
+      {
++#ifdef __EMSCRIPTEN__
++      vb_dl_world = (uint8_t)world;
++#endif
+       DrawAffine(fb[lr], (block_no * 8) + y, lr, param_base, bgmap_base * 4096, over, overplane_char, scx, scy,
+                         gx + (lr ? gp : -gp), gy, window_width, window_height);
+      }
+@@ -422,6 +477,9 @@ void VIP_DrawBlock(uint8 block_no, uint8 *fb_l, uint8 *fb_r)
+      if(bgm == 1)	/* HBias */
+       srcX += (int16)DRAM[(param_base + (((RealY - DestY) * 2) | lr)) & 0xFFFF];
+ 
++#ifdef __EMSCRIPTEN__
++     vb_dl_world = (uint8_t)world;
++#endif
+      DrawBG(fb[lr], RealY, lr, bgmap_base, over, overplane_char, (int32)(int16)srcX, (int32)(int16)srcY, scx, scy, DestX, DestY, window_width, window_height);
+     }
+    }
+-- 
+2.43.0
+

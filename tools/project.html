@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sythnvtby — Project tool</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;560;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/theme.css" />
+  <style>
+    :root {
+      --bg: var(--bg0);
+      --panel: var(--surface-glass);
+      --pink: #e070b0;
+      --accent-warm: var(--focus);
+    }
+    * { box-sizing: border-box; }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Top bar */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.4rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .brand { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }
+    .brand span { color: var(--accent); }
+    .menu-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .menu-row a, .menu-row button.linkish {
+      color: var(--muted);
+      text-decoration: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+      text-transform: inherit;
+      letter-spacing: inherit;
+      padding: 0.2rem 0.35rem;
+      border-radius: 4px;
+    }
+    .menu-row a:hover, .menu-row button.linkish:hover { color: var(--cyan); background: rgba(94, 184, 168, 0.08); }
+    .file-menu {
+      position: relative;
+    }
+    .file-menu > summary {
+      list-style: none;
+      cursor: pointer;
+      color: var(--muted);
+      text-decoration: none;
+      background: none;
+      border: none;
+      font: inherit;
+      text-transform: inherit;
+      letter-spacing: inherit;
+      padding: 0.2rem 0.35rem;
+      border-radius: 4px;
+    }
+    .file-menu > summary::-webkit-details-marker { display: none; }
+    .file-menu[open] > summary { color: var(--cyan); background: rgba(94, 184, 168, 0.08); }
+    .file-menu > summary:hover { color: var(--cyan); background: rgba(94, 184, 168, 0.08); }
+    .file-menu-panel {
+      position: absolute;
+      left: 0;
+      top: 100%;
+      margin-top: 0.2rem;
+      min-width: 11rem;
+      padding: 0.3rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      z-index: 100;
+    }
+    .file-menu-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 0.38rem 0.55rem;
+      margin: 0;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .file-menu-item:hover:not(:disabled) {
+      background: rgba(94, 184, 168, 0.1);
+      color: var(--cyan);
+    }
+    .file-menu-item:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .file-menu-sep {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0.3rem 0.25rem;
+    }
+    .file-menu-home-label {
+      padding: 0.25rem 0.55rem 0.15rem;
+      font-size: 0.68rem;
+      color: var(--muted);
+      max-width: 14rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .header-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .header-actions label { font-size: 0.75rem; color: var(--muted); display: flex; align-items: center; gap: 0.25rem; }
+    .header-actions input[type="file"] { max-width: 10rem; font-size: 0.7rem; }
+    .btn-primary {
+      background: linear-gradient(165deg, var(--accent-dim), var(--accent));
+      color: #fff;
+      border: 1px solid rgba(192, 57, 43, 0.45);
+      padding: 0.35rem 0.7rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 560;
+      cursor: pointer;
+      transition: filter 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.08); border-color: rgba(255, 180, 160, 0.5); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 0.3rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--border-strong); background: rgba(255, 255, 255, 0.03); }
+    .btn-ghost.active { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-soft); }
+    /* Keeps "Emulator" (which leaves the page) away from Save and Play. */
+    .header-divider { width: 1px; align-self: stretch; margin: 0 0.35rem; background: var(--line, #333); }
+    .frame-panel { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.7rem; color: var(--muted); }
+    .frame-panel select { width: 100%; }
+    .frame-panel label { display: flex; align-items: center; gap: 0.3rem; }
+    .frame-panel input[type='range'] { flex: 1; min-width: 0; }
+    .frame-panel .frame-step { justify-content: space-between; }
+    .frame-panel-row { display: flex; gap: 0.4rem; }
+    .frame-panel-row label { flex: 1; }
+    .frame-panel-row select { min-width: 0; }
+    .frame-check { cursor: pointer; }
+    .frame-hint { font-size: 0.64rem; line-height: 1.35; }
+    #preview-brightness-value { min-width: 2.6rem; text-align: right; }
+    .frame-step { display: inline-flex; align-items: center; gap: 0.25rem; }
+    .frame-step .btn-ghost { font-size: 0.8rem; padding: 0.1rem 0.45rem; line-height: 1.2; }
+    .frame-step #frame-position { font-size: 0.68rem; font-family: var(--font-mono); min-width: 3.2rem; }
+
+    /* Main shell */
+    .shell {
+      flex: 1;
+      display: grid;
+      grid-template-columns: clamp(280px, 26vw, 360px) 1fr 240px;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 0;
+      min-height: 0;
+    }
+    @media (max-width: 960px) {
+      body { height: auto; min-height: 100vh; overflow: visible; }
+      .shell { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; }
+      .rail-left .world-grid button { aspect-ratio: auto; }
+    }
+
+    .rail-left {
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      overflow: auto;
+    }
+    .rail-right {
+      border-left: 1px solid var(--border);
+      background: var(--panel);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      overflow: auto;
+    }
+    .center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0.5rem;
+      gap: 0.35rem;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .panel-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin: 0 0 0.35rem 0;
+    }
+    .world-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 3px;
+    }
+    .world-grid button {
+      aspect-ratio: 1;
+      min-height: 28px;
+      font-size: 0.65rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 3px;
+      cursor: pointer;
+      padding: 0;
+    }
+    .world-grid button.on { background: rgba(94, 184, 168, 0.2); color: var(--cyan); border-color: var(--cyan); }
+    .world-grid button:disabled { opacity: 0.3; cursor: default; }
+    .world-chip { display: inline-flex; align-items: center; gap: 0.1rem; padding: 0 0.3rem; border: 1px solid var(--cyan); border-radius: 3px; color: var(--cyan); font-family: var(--font-mono, monospace); }
+    .world-chip button { font-size: 0.7rem; padding: 0 0.15rem; line-height: 1; border: 0; }
+    .world-suggest { font-size: 0.68rem; padding: 0.1rem 0.35rem; }
+    .world-grid button.empty.on { border-style: dashed; }
+    .world-grid button.all { grid-column: span 8; aspect-ratio: auto; min-height: 26px; }
+    .world-grid button.all.on { background: rgba(94, 184, 168, 0.12); color: var(--cyan); border-color: var(--cyan); }
+    #world-filter-debug {
+      font-size: 0.65rem;
+      line-height: 1.35;
+      color: var(--muted);
+      margin: 0.25rem 0 0 0;
+      min-height: 1.2em;
+    }
+    #world-filter-debug strong { color: var(--text); font-weight: 600; }
+
+    .pool-line {
+      font-size: 0.75rem;
+      color: var(--text);
+      padding: 0.35rem;
+      background: var(--surface-2);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .pool-line .muted { color: var(--muted); font-size: 0.68rem; }
+    .pool-line .frame-variant-hint {
+      margin-top: 0.35rem;
+      font-size: 0.7rem;
+      line-height: 1.35;
+      color: var(--text);
+    }
+
+    .inspector {
+      font-size: 0.75rem;
+      line-height: 1.45;
+    }
+    /* Debugging numbers and notes: shown only with File ▸ Developer details. */
+    body:not(.dev-details) .dev-only { display: none !important; }
+    .file-menu-check { display: flex; align-items: center; gap: 0.4rem; }
+    .inspector-answer-line { margin: 0; }
+    .inspector-answer-line.is-uncoloured { color: var(--accent-warm); }
+    .inspector-fix { margin-top: 0.35rem; }
+    .inspector-fix + .inspector-fix { margin-left: 0.3rem; }
+    .group-row .behind-pill { color: var(--accent-warm); border-color: currentColor; }
+    .shared-tiles { font-size: 0.72rem; margin-top: 0.35rem; line-height: 1.4; }
+    .shared-tiles ul { margin: 0.15rem 0 0; padding-left: 1rem; }
+    .shared-tiles button { font-size: 0.65rem; padding: 0.05rem 0.3rem; margin-left: 0.3rem; }
+    .health-count {
+      align-self: center;
+      font-size: 0.68rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid var(--accent-warm);
+      background: transparent;
+      color: var(--accent-warm);
+      cursor: pointer;
+    }
+    dialog#health-dialog { max-width: min(96vw, 36rem); }
+    .health-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; max-height: min(56vh, 26rem); overflow-y: auto; }
+    .health-issue { border: 1px solid var(--border); border-radius: 4px; padding: 0.35rem 0.45rem; background: var(--surface-2); font-size: 0.72rem; line-height: 1.4; }
+    .health-issue.is-problem { border-left: 3px solid var(--accent-warm); }
+    .health-issue p { margin: 0; }
+    .health-actions { display: flex; gap: 0.3rem; margin-top: 0.3rem; }
+    .health-actions button { font-size: 0.68rem; padding: 0.15rem 0.4rem; }
+    .health-status { font-size: 0.72rem; margin: 0 0 0.4rem; }
+    .health-todos > summary { font-size: 0.72rem; cursor: pointer; margin: 0.4rem 0 0.3rem; }
+    dialog#game-states-dialog { max-width: min(96vw, 40rem); }
+    dialog#storage-dialog { max-width: min(96vw, 46rem); }
+    #storage-body { font-size: 0.72rem; line-height: 1.4; max-height: min(70vh, 34rem); overflow-y: auto; }
+    #storage-body h3 { font-size: 0.78rem; margin: 0.6rem 0 0.3rem; }
+    .storage-table { border-collapse: collapse; width: 100%; }
+    .storage-table th, .storage-table td { text-align: left; padding: 0.2rem 0.4rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .storage-table td:nth-child(2), .storage-table td:nth-child(3) { white-space: nowrap; }
+    .storage-question { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-top: 0.2rem; }
+    #storage-body button { font-size: 0.66rem; padding: 0.1rem 0.4rem; margin-left: 0.3rem; }
+    #game-states-body { font-size: 0.72rem; line-height: 1.4; max-height: min(70vh, 34rem); overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; }
+    #game-states-body h3 { font-size: 0.78rem; margin: 0 0 0.3rem; }
+    .gs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+    .gs-state, .gs-question { border: 1px solid var(--border); border-radius: 4px; padding: 0.35rem 0.45rem; background: var(--surface-2); }
+    .gs-actions { margin-left: 0.4rem; }
+    .gs-question-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+    .gs-sides { border-collapse: collapse; margin: 0.25rem 0; }
+    .gs-sides td { padding: 0.1rem 0.5rem 0.1rem 0; }
+    .gs-candidates { display: flex; flex-direction: column; gap: 0.1rem; margin: 0.2rem 0; }
+    .gs-enough { color: var(--cyan); }
+    .gs-recording, .gs-near-row { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; margin-top: 0.15rem; }
+    #game-states-body button { font-size: 0.66rem; padding: 0.1rem 0.4rem; }
+    .inspector-details { margin-top: 0.35rem; font-size: 0.72rem; }
+    .inspector-details > summary { cursor: pointer; color: var(--muted); }
+    .inspector-details > .inspector { margin-top: 0.3rem; }
+    #inspector-why:empty { display: none; }
+    #inspector-why p { margin: 0 0 0.25rem 0; }
+    .inspector pre {
+      margin: 0.25rem 0 0 0;
+      font-size: 0.65rem;
+      background: rgba(0, 0, 0, 0.28);
+      padding: 0.35rem;
+      border-radius: 4px;
+      overflow: auto;
+      max-height: 8rem;
+    }
+    .v2-advanced {
+      margin-top: 0.45rem;
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+      padding: 0.35rem 0.45rem;
+      background: rgba(34, 34, 40, 0.6);
+    }
+    .v2-advanced > summary {
+      cursor: pointer;
+      font-size: 0.68rem;
+      color: var(--muted);
+      list-style-position: outside;
+    }
+    .v2-advanced[open] > summary { color: var(--text); }
+    .v2-authoring-body { margin-top: 0.4rem; padding-top: 0.35rem; border-top: 1px solid var(--border); }
+    .v2-authoring-label {
+      display: block;
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+    .v2-variant-select {
+      width: 100%;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.35rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+    .v2-paint-btn { width: 100%; text-align: center; }
+    .v2-authoring-hint {
+      font-size: 0.65rem;
+      margin: 0.35rem 0 0 0;
+      line-height: 1.35;
+    }
+    .v2-authoring code { font-size: 0.62rem; }
+    .v2-variant-auto {
+      margin: 0.25rem 0 0.35rem 0;
+      font-size: 0.68rem;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+    .v2-variant-auto:hover { color: var(--cyan); }
+
+    .canvas-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.5rem;
+      width: min(100%, 768px);
+      max-width: 100%;
+      padding: 0.35rem 0.4rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+    .canvas-toolbar .toolbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .canvas-toolbar button {
+      padding: 0.32rem 0.55rem;
+      font-size: 0.76rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .canvas-toolbar button.toolbar-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.28rem 0.38rem;
+      min-width: 2.35rem;
+      min-height: 2.35rem;
+    }
+    .canvas-toolbar button.toolbar-icon-btn img {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      pointer-events: none;
+    }
+    .canvas-toolbar button:hover:not(:disabled) {
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+    .canvas-toolbar button.active {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .canvas-toolbar button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .canvas-toolbar .tile-selection-hint {
+      flex: 1;
+      min-width: 12rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .canvas-toolbar .tile-selection-hint strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .canvas-toolbar label.zoom-paint-color {
+      display: inline-flex;
+      align-items: center;
+      margin: 0;
+      cursor: pointer;
+    }
+    .canvas-toolbar label.zoom-paint-color input[type='color'] {
+      width: 2.25rem;
+      height: 2rem;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface-2);
+      cursor: pointer;
+    }
+    .canvas-toolbar label.zoom-paint-color input[type='color']:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .canvas-toolbar label.fill-across-tiles {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+      user-select: none;
+      padding: 0.15rem 0.3rem;
+      border-radius: 4px;
+      border: 1px solid transparent;
+    }
+    .canvas-toolbar label.fill-across-tiles:hover:not(:has(input:disabled)) {
+      color: var(--text);
+      background: rgba(94, 184, 168, 0.08);
+    }
+    .canvas-toolbar label.fill-across-tiles:has(input:checked) {
+      color: var(--cyan);
+      border-color: rgba(94, 184, 168, 0.35);
+      background: rgba(94, 184, 168, 0.1);
+    }
+    .canvas-toolbar label.fill-across-tiles input {
+      margin: 0;
+      accent-color: var(--cyan);
+    }
+    .canvas-toolbar label.fill-across-tiles:has(input:disabled) {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      background: #0a0a0e;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      line-height: 0;
+      width: min(100%, 768px);
+      max-width: 100%;
+    }
+    /* Size: Fill — the canvas takes the whole work column, but never more height than the window
+       has (toolbar above, frame details below). 1:1 is the 768-pixel box above. */
+    .canvas-wrap.fill {
+      width: min(100%, calc((100vh - 12rem) * 384 / 224));
+    }
+    .canvas-meta.fill {
+      max-width: none;
+      width: min(100%, calc((100vh - 12rem) * 384 / 224));
+    }
+    .canvas-wrap.zoomed {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px rgba(94, 184, 168, 0.35);
+    }
+    #main-canvas,
+    #selection-overlay {
+      display: block;
+      width: 100%;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    #selection-overlay {
+      position: absolute;
+      left: 0;
+      top: 0;
+      pointer-events: none;
+    }
+    .canvas-meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+      width: 100%;
+      max-width: 768px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .groups-tree {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.78rem;
+    }
+    .pool-accordion,
+    .variant-accordion {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: rgba(34, 34, 40, 0.75);
+      overflow: hidden;
+    }
+    .pool-accordion > summary,
+    .variant-accordion > summary {
+      cursor: pointer;
+      padding: 0.38rem 0.45rem;
+      font-size: 0.72rem;
+      color: var(--text);
+      background: var(--surface-2);
+      list-style-position: outside;
+    }
+    .pool-accordion > summary { font-weight: 600; }
+    .variant-accordion > summary {
+      font-weight: 500;
+      color: var(--muted);
+      padding-left: 0.55rem;
+    }
+    .pool-accordion.legacy-pool > summary { color: var(--accent-warm); }
+    .pool-body {
+      padding: 0.35rem 0.35rem 0.45rem 0.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .variant-body { padding: 0 0 0.15rem 0.35rem; }
+    .groups-in-variant {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    /* Quick search over the group list (tools/painter.js applyGroupSearch, src/group-search.js):
+       stays at the top of the rail while the list scrolls under it. */
+    .group-search {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0 0.4rem;
+      background: var(--surface);
+    }
+    #group-search {
+      flex: 1;
+      min-width: 0;
+      padding: 0.3rem 0.45rem;
+      font: inherit;
+      font-size: 0.74rem;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+    }
+    #group-search:focus { outline: none; border-color: var(--cyan); }
+    #group-search-count { font-size: 0.62rem; white-space: nowrap; }
+    .group-on-frame { display: flex; align-items: center; gap: 0.2rem; font-size: 0.66rem; white-space: nowrap; }
+    #groups-tree [hidden] { display: none !important; }
+    .group-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.4rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      font-size: 0.76rem;
+      cursor: pointer;
+    }
+    .group-row.bg-kind { border-left: 3px solid var(--cyan); }
+    .group-row.obj-kind { border-left: 3px solid var(--accent-warm); }
+    .group-row.group-selected {
+      outline: 2px solid var(--pink);
+      outline-offset: -1px;
+      border-color: var(--pink);
+    }
+    .group-row:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+    .variant-empty {
+      font-size: 0.68rem;
+      color: var(--muted);
+      padding: 0.2rem 0.35rem;
+    }
+    .group-detail {
+      font-size: 0.72rem;
+      line-height: 1.45;
+      padding: 0.45rem;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      min-height: 4rem;
+    }
+    .group-detail pre {
+      margin: 0.35rem 0 0 0;
+      font-size: 0.62rem;
+      max-height: 10rem;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .badge {
+      font-size: 0.58rem;
+      font-weight: 700;
+      padding: 0.1rem 0.28rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .badge-bg { background: rgba(94, 184, 168, 0.2); color: var(--cyan); }
+    .badge-obj { background: rgba(232, 160, 96, 0.2); color: var(--accent-warm); }
+    /* Where a group shows up: after the name (order), so the name stays the row's last child. */
+    .screens-pill {
+      order: 2;
+      flex: none;
+      max-width: 7rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.58rem;
+      padding: 0.08rem 0.32rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .screens-pill.screens-shared {
+      border-color: var(--accent-warm);
+      color: var(--accent-warm);
+      background: rgba(232, 160, 96, 0.12);
+    }
+    .screens-pill.screens-none { border-style: dashed; }
+    .screens-pill.touch-up-pill { border-color: #f0b429; color: #f0b429; }
+    .screens-pill.screen-limit-pill { border-color: var(--accent-warm); color: var(--accent-warm); }
+    .shared-pool > summary { color: var(--accent-warm); }
+
+    .bottom-strip {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      padding: 0.4rem 0.75rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .live-dot { color: #6c6; font-weight: 600; }
+    .status-bar { font-size: 0.78rem; color: var(--muted); padding: 0.25rem 0.75rem; }
+
+    .groups-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 0.4rem;
+    }
+    .groups-actions .btn-ghost {
+      font-size: 0.72rem;
+      padding: 0.28rem 0.45rem;
+    }
+    #save-progress-dialog { max-width: min(96vw, 24rem); }
+    .save-progress-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .save-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--accent));
+      transition: width 0.12s linear;
+    }
+    .save-progress-now { margin: 0; font-size: 0.74rem; color: var(--text); min-height: 1.1rem; }
+    .save-progress-steps {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.18rem;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .save-progress-steps li { display: flex; gap: 0.4rem; align-items: baseline; }
+    .save-progress-steps .mark { width: 1rem; flex: none; text-align: center; }
+    .save-progress-steps .ms { margin-left: auto; font-family: var(--font-mono); font-size: 0.64rem; }
+    .save-progress-steps li.is-running { color: var(--text); }
+    .save-progress-steps li.is-done .mark { color: var(--cyan); }
+    .save-progress-steps li.is-failed { color: var(--accent-warm); }
+
+    /* The dialog is a table of colours, so it needs more room than the form dialogs. */
+    #paint-inventory-dialog { max-width: min(96vw, 40rem); }
+    .paint-inventory-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      max-height: min(56vh, 26rem);
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.3rem;
+      background: var(--surface-2);
+    }
+    .paint-row {
+      display: grid;
+      grid-template-columns: 26px 1fr auto;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.3rem;
+      border-radius: 3px;
+    }
+    .paint-row + .paint-row { border-top: 1px solid var(--border); }
+    .paint-row.is-orphan { background: rgba(232, 160, 96, 0.1); }
+    .paint-swatch {
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      image-rendering: pixelated;
+      display: block;
+    }
+    .paint-row-main { font-size: 0.7rem; line-height: 1.35; min-width: 0; }
+    .paint-row-where { color: var(--muted); font-size: 0.65rem; }
+    .paint-row-where .orphan-flag { color: var(--accent-warm); font-weight: 600; }
+    .paint-row .btn-ghost { font-size: 0.66rem; padding: 0.18rem 0.4rem; }
+    .paint-row-actions { display: flex; gap: 0.25rem; align-items: center; }
+    .paint-row-actions .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+    .paint-inventory-empty { color: var(--muted); font-size: 0.7rem; padding: 0.5rem 0.3rem; }
+    .paint-expand {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      padding: 0 0.25rem 0 0;
+      line-height: 1;
+    }
+    .paint-expand:hover { color: var(--cyan); }
+    .paint-row.is-overlay { background: rgba(94, 184, 168, 0.06); }
+    /* A tile inside an overlay: indented under the group row it belongs to. */
+    .paint-row.is-child {
+      margin-left: 1.1rem;
+      border-top: 1px solid var(--border);
+      border-left: 2px solid var(--cyan-soft, rgba(94, 184, 168, 0.35));
+      padding-left: 0.4rem;
+    }
+
+    #new-group-dialog,
+    #new-pose-dialog,
+    #paint-inventory-dialog,
+    #save-progress-dialog,
+    #import-pack-dialog,
+    #health-dialog,
+    #storage-dialog,
+    #game-states-dialog,
+    #frame-cleanup-dialog,
+    #duplicate-group-dialog {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0;
+      background: var(--surface);
+      color: var(--text);
+      max-width: min(96vw, 26rem);
+    }
+    #new-group-dialog::backdrop,
+    #new-pose-dialog::backdrop,
+    #paint-inventory-dialog::backdrop,
+    #save-progress-dialog::backdrop,
+    #import-pack-dialog::backdrop,
+    #health-dialog::backdrop,
+    #storage-dialog::backdrop,
+    #game-states-dialog::backdrop,
+    #frame-cleanup-dialog::backdrop,
+    #duplicate-group-dialog::backdrop {
+      background: rgba(0, 0, 0, 0.55);
+    }
+    #new-group-dialog form,
+    #new-pose-dialog form,
+    #paint-inventory-dialog form,
+    #save-progress-dialog form,
+    #import-pack-dialog form,
+    #health-dialog form,
+    #storage-dialog form,
+    #game-states-dialog form,
+    #frame-cleanup-dialog form,
+    #duplicate-group-dialog form {
+      padding: 0.65rem 0.75rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    #new-group-dialog h2,
+    #new-pose-dialog h2,
+    #paint-inventory-dialog h2,
+    #save-progress-dialog h2,
+    #import-pack-dialog h2,
+    #health-dialog h2,
+    #storage-dialog h2,
+    #game-states-dialog h2,
+    #frame-cleanup-dialog h2,
+    #duplicate-group-dialog h2 {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    #import-pack-dialog { max-width: min(96vw, 36rem); }
+    #frame-cleanup-dialog { max-width: min(96vw, 46rem); }
+    .frame-cleanup-tools { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; font-size: 0.72rem; }
+    .frame-cleanup-list { max-height: 55vh; overflow: auto; border: 1px solid var(--border); border-radius: 4px; }
+    .frame-cleanup-row { display: grid; grid-template-columns: auto 96px 1fr auto; gap: 0.5rem; align-items: center; padding: 0.3rem 0.45rem; border-bottom: 1px solid var(--border); font-size: 0.7rem; line-height: 1.35; }
+    .frame-cleanup-row:last-child { border-bottom: 0; }
+    .frame-cleanup-row.kept { opacity: 0.6; }
+    .frame-cleanup-row img, .frame-cleanup-row .no-shot { width: 96px; height: 56px; object-fit: contain; background: #000; border-radius: 2px; image-rendering: pixelated; }
+    .frame-cleanup-row .why { color: var(--muted); }
+    .frame-cleanup-row .size { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .frame-cleanup-screen { position: sticky; top: 0; background: var(--surface); padding: 0.25rem 0.45rem; font-size: 0.72rem; font-weight: 600; border-bottom: 1px solid var(--border); z-index: 1; }
+    .import-pack-summary { max-height: 50vh; overflow: auto; font-size: 0.72rem; line-height: 1.45; }
+    .import-pack-summary h3 { margin: 0.4rem 0 0.15rem; font-size: 0.75rem; font-weight: 600; }
+    .import-pack-summary ul { margin: 0; padding-left: 1.1rem; }
+    .import-pack-clash { border: 1px solid var(--border); border-radius: 4px; font-size: 0.72rem; display: flex; gap: 0.8rem; flex-wrap: wrap; }
+    .import-pack-clash legend { color: var(--muted); }
+    #new-group-dialog label,
+    #new-pose-dialog label,
+    #paint-inventory-dialog label,
+    #duplicate-group-dialog label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    #new-group-dialog input[type="text"],
+    #new-group-dialog select,
+    #new-pose-dialog input[type="text"],
+    #new-pose-dialog input[type="search"],
+    #new-pose-dialog select,
+    #paint-inventory-dialog select,
+    #duplicate-group-dialog select {
+      font-size: 0.78rem;
+      padding: 0.3rem 0.35rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+    }
+    /* New pose's group picker: a filter box joined to an always-open list (tools/painter/sprite-profiles-ui.js). */
+    #new-pose-target-filter { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+    #new-pose-target-filter:focus,
+    #new-pose-target:focus { outline: none; border-color: var(--cyan); }
+    #new-pose-target {
+      margin-top: -0.2rem;
+      border-top: none !important;
+      border-top-left-radius: 0 !important;
+      border-top-right-radius: 0 !important;
+      min-height: 8.5rem;
+    }
+    #new-pose-target option { padding: 0.15rem 0.3rem; border-radius: 3px; }
+    #new-pose-target option:checked { background: var(--cyan-soft, rgba(80, 200, 220, 0.25)); color: var(--text); }
+    #new-pose-target-note { font-size: 0.62rem; }
+
+    #new-group-dialog .overlap-banner,
+    #new-pose-dialog .overlap-banner {
+      font-size: 0.7rem;
+      line-height: 1.4;
+      padding: 0.4rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid var(--accent-warm);
+      background: rgba(232, 160, 96, 0.12);
+      color: var(--text);
+    }
+    #new-group-dialog .overlap-banner .muted { color: var(--muted); font-size: 0.65rem; }
+    #paint-inventory-dialog .membership-banner,
+    #new-group-dialog .membership-banner,
+    #new-pose-dialog .membership-banner {
+      font-size: 0.7rem;
+      line-height: 1.4;
+      padding: 0.4rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid rgba(94, 160, 224, 0.55);
+      background: rgba(94, 160, 224, 0.1);
+      color: var(--text);
+    }
+    #new-group-dialog .membership-banner.warn {
+      border-color: var(--accent-warm);
+      background: rgba(232, 160, 96, 0.12);
+    }
+    #new-group-dialog .membership-banner .muted { color: var(--muted); font-size: 0.65rem; }
+    #new-group-dialog .dialog-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      align-items: center;
+    }
+    #new-group-dialog .dialog-actions,
+    #new-pose-dialog .dialog-actions,
+    #duplicate-group-dialog .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.4rem;
+      margin-top: 0.25rem;
+    }
+    .group-detail-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: 0.45rem;
+    }
+    #new-pose-dialog label[hidden] { display: none; }
+    .select-mode { display: inline-flex; gap: 2px; }
+    .select-mode .btn-ghost { font-size: 0.68rem; padding: 0.24rem 0.4rem; }
+    .select-mode .btn-ghost.active { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-soft); }
+    .stack-list { display: flex; flex-direction: column; gap: 2px; margin-top: 0.2rem; }
+    .stack-row {
+      display: grid;
+      grid-template-columns: 3rem 4.5rem 4rem 1fr 1fr;
+      gap: 0.3rem;
+      align-items: baseline;
+      text-align: left;
+      font-size: 0.65rem;
+      padding: 0.2rem 0.3rem;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .stack-row:hover { border-color: var(--border-strong); }
+    .pose-section {
+      margin-top: 0.5rem;
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.72rem;
+    }
+    .pose-section-head { margin-bottom: 0.3rem; }
+    .pose-empty { font-size: 0.66rem; line-height: 1.4; }
+    .pose-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+    .pose-row {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.3rem 0.4rem;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .pose-row-main { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: baseline; }
+    .pose-name { font-weight: 600; }
+    .pose-note { font-size: 0.65rem; line-height: 1.35; color: var(--accent-warm); margin-top: 0.15rem; }
+    .pose-row-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; margin-top: 0.3rem; }
+    .pose-row-actions .btn-ghost { font-size: 0.64rem; padding: 0.12rem 0.32rem; }
+    .pose-mirror { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.64rem; color: var(--muted); }
+    .pose-row-actions .pose-delete { color: #f0a0b0; }
+    .group-detail-actions .btn-danger {
+      background: rgba(180, 60, 80, 0.2);
+      border: 1px solid rgba(180, 60, 80, 0.55);
+      color: #f0a0b0;
+      padding: 0.28rem 0.45rem;
+      font-size: 0.72rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .group-detail-actions .btn-danger:hover {
+      background: rgba(180, 60, 80, 0.35);
+    }
+    .group-detail-name-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.35rem;
+    }
+    .group-detail-name-row label {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+    #group-display-name-input {
+      flex: 1;
+      min-width: 8rem;
+      font-size: 0.76rem;
+      padding: 0.25rem 0.35rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <div class="brand">sythnvtby <span style="font-weight:400;color:var(--muted);font-size:0.85rem">Project tool</span></div>
+      <nav class="menu-row" aria-label="Main">
+        <details class="file-menu" id="file-menu">
+          <summary class="file-menu-summary">File</summary>
+          <div class="file-menu-panel" role="menu">
+            <button type="button" class="file-menu-item" id="file-menu-open" role="menuitem">Open pack…</button>
+            <button type="button" class="file-menu-item" id="file-menu-save" role="menuitem" disabled>Save</button>
+            <button type="button" class="file-menu-item" id="file-menu-save-as" role="menuitem" disabled>Save as…</button>
+            <button type="button" class="file-menu-item" id="file-menu-import-pack" role="menuitem" disabled title="Bring groups, poses, paint and frames from another .vbpack into this project. Shows what would come across first; nothing is saved until you Save.">Import from another pack…</button>
+            <button type="button" class="file-menu-item" id="file-menu-cleanup-frames" role="menuitem" disabled title="Take captured frames you no longer need out of the project: archive them into a separate .vbpack (Import from another pack brings them back) or delete them.">Clean up frames…</button>
+            <button type="button" class="file-menu-item" id="file-menu-storage" role="menuitem" disabled title="What this project's space is used for — frames, screenshots, save states, memory recordings — and ways to make it smaller.">Project storage…</button>
+            <button type="button" class="file-menu-item" id="file-menu-check-project" role="menuitem" disabled title="Look through every captured frame for paint that drops out — a group moved to another world, a layer scrolling past its overpaint, two groups painting the same tiles — with one fix for each.">Check project…</button>
+            <button type="button" class="file-menu-item" id="file-menu-export-png" role="menuitem" disabled>Export frame PNG…</button>
+            <button type="button" class="file-menu-item" id="file-menu-export-player" role="menuitem" disabled title="Save a play pack (.vbcplay) for the sythnvtby player: your colours only — no ROM, no captures. The player asks for the ROM and checks it is the right one.">Export for player…</button>
+            <hr class="file-menu-sep" />
+            <button type="button" class="file-menu-item" id="file-menu-analyze-memory" role="menuitem" disabled title="Find the WRAM bytes that identify each captured game state and seed memory pools from them. Writes into the pack you have open — save when it finishes.">Analyze memory…</button>
+            <button type="button" class="file-menu-item" id="file-menu-game-states" role="menuitem" disabled title="The project's game states (named memory conditions groups can depend on), and questions that find them from recordings of each side.">Game states…</button>
+            <hr class="file-menu-sep" />
+            <div class="file-menu-home-label" id="file-menu-home-label" role="presentation">Home: Not set</div>
+            <button type="button" class="file-menu-item" id="file-menu-home-grant" role="menuitem" hidden>Grant folder access</button>
+            <button type="button" class="file-menu-item" id="file-menu-home-choose" role="menuitem">Choose project home…</button>
+            <button type="button" class="file-menu-item" id="file-menu-home-clear" role="menuitem" disabled>Clear project home</button>
+            <hr class="file-menu-sep" />
+            <label class="file-menu-item file-menu-check" title="Show the numbers and notes meant for debugging the tools: draw counts per world, pool context, preview notes. Remembered in this browser."><input type="checkbox" id="toggle-dev-details" /> Developer details</label>
+          </div>
+        </details>
+        <button type="button" class="health-count" id="btn-health-count" hidden title="Things in this project to check: open the list (File ▸ Check project…)"></button>
+        <details class="file-menu" id="frame-menu">
+          <summary class="file-menu-summary">Frame</summary>
+          <div class="file-menu-panel" role="menu">
+            <div class="file-menu-home-label" id="frame-menu-label" role="presentation">No frame</div>
+            <button type="button" class="file-menu-item" id="frame-menu-export-shot" role="menuitem" disabled title="Download the screenshot captured with this frame, to colorize in another tool">Export screenshot</button>
+            <button type="button" class="file-menu-item" id="frame-menu-add-reference" role="menuitem" disabled title="Import a colorized version of this frame to paint from">Add colorized reference…</button>
+            <button type="button" class="file-menu-item" id="frame-menu-remove-reference" role="menuitem" disabled title="Forget the reference image shown for this frame">Remove reference</button>
+            <hr class="file-menu-sep" />
+            <button type="button" class="file-menu-item" id="frame-menu-copy-ref" role="menuitem" disabled title="Copy this frame's number, name and id (e.g. “#57 · InGame · f-…”) to refer to it in a note or a message">Copy reference</button>
+            <button type="button" class="file-menu-item" id="frame-menu-go-to" role="menuitem" disabled title="Go to a frame by its number (#57), name or id — a typo or two in an id is forgiven">Go to frame…</button>
+            <button type="button" class="file-menu-item" id="frame-menu-rename" role="menuitem" disabled title="Give this frame a name of your own">Rename frame…</button>
+            <button type="button" class="file-menu-item" id="frame-menu-tags" role="menuitem" disabled title="Tag this frame for filtering later">Edit tags…</button>
+          </div>
+        </details>
+        <input type="file" accept=".vbpack,.zip" id="file-vbpack" hidden />
+        <input type="file" accept=".vbpack,.zip" id="file-import-vbpack" hidden />
+        <input type="file" accept="image/png,image/jpeg,image/webp" id="reference-input" hidden />
+        <a href="index.html">Tools index</a>
+      </nav>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="btn-primary" id="btn-save-and-play" disabled title="Write the updated .vbpack and return to the emulator, resuming from the Colorize! save state">Save and Play</button>
+      <button type="button" class="btn-ghost" id="btn-retry-handoff" style="display:none" title="Retry loading the pack Colorize! wrote into IndexedDB">Retry load from emulator</button>
+      <button type="button" id="btn-open-sprite-studio" disabled title="Open this pack in SpriteStudio: pick a sprite and step through its poses over the background they were captured on.">SpriteStudio →</button>
+      <button type="button" class="btn-primary" id="btn-reload" disabled>Reload frame</button>
+      <span class="header-divider" aria-hidden="true"></span>
+      <button type="button" class="btn-ghost" id="btn-goto-emulator" title="Leave the Project tool and open the emulator. Unsaved work stays in the pack only if you save first.">Emulator</button>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="rail-left">
+      <div>
+        <p class="panel-title">Frame</p>
+        <div class="frame-panel">
+          <select id="frame-select" aria-label="Frame"></select>
+          <div class="frame-step">
+            <button type="button" class="btn-ghost" id="btn-frame-prev" disabled title="Previous frame" aria-label="Previous frame">&lt;</button>
+            <span id="frame-position" class="muted" aria-live="polite"></span>
+            <button type="button" class="btn-ghost" id="btn-frame-next" disabled title="Next frame" aria-label="Next frame">&gt;</button>
+          </div>
+          <div class="frame-panel-row">
+            <label title="Narrow the Frame list (and &lt; &gt;) to frames still needing colour: tiles with no paint at all, or any lit pixel nothing colours (partly painted tiles too). Left eye.">Show <select id="frame-filter">
+              <option value="all">All frames</option>
+              <option value="tiles">With uncoloured tiles</option>
+              <option value="pixels">With uncoloured pixels</option>
+            </select></label>
+            <label id="frame-highlight-wrap" hidden title="Mark what is still uncoloured on this frame in cyan and dim the rest: tiles with no paint at all, or every lit pixel nothing colours — whichever the Show filter is set to. (H)"><input type="checkbox" id="frame-highlight" /> Highlight</label>
+            <span id="frame-highlight-note" class="muted" aria-live="polite"></span>
+          </div>
+          <div class="frame-panel-row">
+            <label>Eye <select id="eye-select"><option value="0">Left</option><option value="1">Right</option></select></label>
+            <label>Layer <select id="layer-select">
+              <option value="all">All</option>
+              <option value="0">BG</option>
+              <option value="1">Affine</option>
+              <option value="2">OBJ</option>
+            </select></label>
+          </div>
+          <label class="frame-check" title="Overlay the screenshot captured with this frame, for visual parity checks">
+            <input type="checkbox" id="toggle-shot-overlay" /> Screenshot overlay
+          </label>
+          <div id="reference-tools" hidden>
+          <label class="frame-check" title="Overlay the colorized reference image for this frame (Frame ▸ Add colorized reference…)">
+            <input type="checkbox" id="toggle-reference-overlay" disabled /> Reference overlay
+          </label>
+          <div class="frame-panel-row">
+            <button type="button" class="btn-ghost" id="btn-reference-transform" disabled title="Move and scale the reference over the frame: drag inside the outline to move it, drag an edge or corner to resize. Picking another tool leaves this mode.">Move &amp; scale</button>
+            <button type="button" class="btn-ghost" id="btn-reference-revert" disabled title="Put the reference back where it landed when it was imported">Revert</button>
+          </div>
+          <button type="button" class="btn-ghost" id="btn-reference-fill-selection" disabled title="Take the selected tiles' colours out of the reference, once per tile pattern">Fill selection from reference</button>
+          <div id="reference-status" class="muted frame-hint">No reference for this frame</div>
+          </div>
+          <label id="overlay-alpha-wrap" hidden title="Opacity of both overlays">
+            Overlay alpha
+            <input type="range" id="shot-overlay-alpha" min="0" max="1" step="0.05" value="0.45" />
+          </label>
+          <label title="Brightness of the captured frame in the preview (unpainted pixels only; painted colors stay as they will look in the emulator). 100% matches the emulator. Double-click the slider to reset to 125%.">
+            Brightness
+            <input type="range" id="preview-brightness" min="0.5" max="2.5" step="0.05" value="1.25" />
+            <span id="preview-brightness-value">125%</span>
+          </label>
+        </div>
+      </div>
+      <div>
+        <p class="panel-title">VIP world (0–31)</p>
+        <div class="world-grid" id="world-grid"></div>
+        <p id="world-filter-debug" class="dev-only" aria-live="polite"></p>
+      </div>
+      <div id="pool-panel" hidden>
+        <p class="panel-title">Memory pool</p>
+        <div class="pool-line" id="pool-summary">
+          <span class="muted">Load a .vbpack</span>
+        </div>
+      </div>
+      <div>
+        <p class="panel-title">This pixel</p>
+        <div class="inspector" id="inspector-answer" aria-live="polite">
+          <span class="muted">Click the frame to see what colours a pixel, or why nothing does.</span>
+        </div>
+        <details class="inspector-details" id="inspector-details">
+          <summary>Details</summary>
+          <div class="inspector" id="inspector-why"></div>
+          <div class="inspector" id="inspector"></div>
+          <div class="inspector" id="draw-stack-panel"></div>
+        </details>
+        <details id="v2-authoring" class="v2-advanced" hidden>
+          <summary>Developer — v2 tile8 rules</summary>
+          <div class="v2-authoring-body">
+            <p class="muted" style="font-size:0.65rem;margin:0 0 0.4rem 0;line-height:1.35">
+              Preview uses an <strong>automatic</strong> variant from pools when possible. Override only if you are debugging variant-scoped rules.
+            </p>
+            <label class="v2-authoring-label" for="v2-variant-select">Manual variant override</label>
+            <select id="v2-variant-select" class="v2-variant-select" aria-label="Manual v2 tile8 variant"></select>
+            <button type="button" class="v2-variant-auto" id="btn-v2-variant-auto">Use automatic variant</button>
+            <button type="button" class="btn-ghost v2-paint-btn" id="btn-paint-v2-top" disabled>
+              Copy front tile → v2 tile8
+            </button>
+            <p class="muted v2-authoring-hint">Uses the frontmost tile at the click. Requires a <code>vbcolor</code> entry for that hash. <strong>Save .vbpack</strong> to persist.</p>
+          </div>
+        </details>
+      </div>
+    </aside>
+
+    <main class="center">
+      <div class="canvas-toolbar" id="canvas-toolbar" role="toolbar" aria-label="Canvas tools">
+        <div class="toolbar-actions">
+          <button type="button" id="btn-canvas-select" class="active toolbar-icon-btn" aria-label="Select — click or drag to select tiles (respects eye, layer, world filters)" title="Select — click or drag (respects eye, layer, world filters)">
+            <img src="../toolbar_images/toolbar_selection.png" width="22" height="22" alt="" />
+          </button>
+          <button type="button" id="btn-zoom-selection" class="toolbar-icon-btn" disabled aria-label="Zoom to selection" title="Zoom to selection">
+            <img src="../toolbar_images/toolbar_zoom_in.png" width="22" height="22" alt="" />
+          </button>
+          <button type="button" id="btn-zoom-grid" class="toolbar-icon-btn" disabled aria-label="Tile grid" title="Show tile boundaries while zoomed">
+            <img src="../toolbar_images/toolbar_grid_toggle.png" width="22" height="22" alt="" />
+          </button>
+          <button type="button" id="btn-paint-fill" class="toolbar-icon-btn" disabled aria-label="Fill" title="Bucket fill — full VIP view or zoomed">
+            <img src="../toolbar_images/toolbar_bucket_fill.png" width="22" height="22" alt="" />
+          </button>
+          <label class="fill-across-tiles" title="When on, bucket fill crosses 8×8 edges within the paint group (same underlay color). When off, fill stays inside one tile.">
+            <input type="checkbox" id="fill-across-tiles" disabled />
+            Across tiles
+          </label>
+          <label class="fill-across-tiles" title="Blank cells (every pixel palette 0) paint nothing, share one pattern hash, and are most of a frame's BG draws. Off: they can't be clicked, boxed, or added to a group.">
+            <input type="checkbox" id="toggle-blank-tiles" />
+            Blank tiles
+          </label>
+          <span class="select-mode" role="group" aria-label="Selection mode" title="What a click or box does to the current selection. Shift-drag always adds.">
+            <button type="button" class="btn-ghost active" id="btn-select-mode-replace" data-select-mode="replace">Replace</button>
+            <button type="button" class="btn-ghost" id="btn-select-mode-add" data-select-mode="add">Add</button>
+            <button type="button" class="btn-ghost" id="btn-select-mode-remove" data-select-mode="remove">Subtract</button>
+          </span>
+          <button type="button" class="btn-ghost" id="btn-select-matching" disabled title="Select every draw on this eye that uses the selected tile's pattern.">Select matching</button>
+          <button type="button" class="btn-ghost active" id="btn-canvas-size" aria-pressed="true" title="Canvas size: Fill makes the frame as large as the work area allows; 1:1 is the original 768-pixel-wide canvas.">Size: Fill</button>
+          <button type="button" id="btn-paint-brush" class="toolbar-icon-btn" disabled aria-label="Brush" title="Brush (zoomed view)">
+            <img src="../toolbar_images/toolbar_paintbrush.png" width="22" height="22" alt="" />
+          </button>
+          <button type="button" id="btn-paint-erase" class="toolbar-icon-btn" disabled aria-label="Eraser" title="Eraser (zoomed view): takes paint off the pixels you drag over, so the game's own picture shows there again. A tile with nothing left counts as unpainted. Ctrl+Z undoes it.">
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.2 3.6 21 8.4a1.5 1.5 0 0 1 0 2.1L12.5 19H20v2H8.6l-5.4-5.4a1.5 1.5 0 0 1 0-2.1l10.9-10.9a1.5 1.5 0 0 1 2.1 0ZM9.4 19l3.2-3.2-5.4-5.4-3.2 3.2L9.4 19Z" fill="currentColor"/></svg>
+          </button>
+          <button type="button" id="btn-paint-color-pick" class="toolbar-icon-btn" disabled aria-label="Pick paint color" title="Pick color from screen (eyedropper), or sample from the preview after clicking">
+            <img src="../toolbar_images/toolbar_eyedropper.png" width="22" height="22" alt="" />
+          </button>
+          <label class="zoom-paint-color" title="Brush / fill color">
+            <span class="visually-hidden">Paint color</span>
+            <input type="color" id="zoom-paint-color" value="#ff4488" disabled aria-label="Paint color for brush and fill" />
+          </label>
+          <button type="button" id="btn-import-asset" class="toolbar-icon-btn dev-only" disabled aria-label="Import asset" title="Import asset (coming later)">
+            <img src="../toolbar_images/toolbar_import.png" width="22" height="22" alt="" />
+          </button>
+        </div>
+        <span class="tile-selection-hint" id="tile-selection-hint">No tiles selected.</span>
+      </div>
+      <div class="canvas-wrap fill">
+        <canvas id="main-canvas" width="384" height="224" aria-label="VIP frame preview"></canvas>
+        <canvas id="selection-overlay" width="384" height="224" aria-hidden="true"></canvas>
+      </div>
+      <div class="canvas-meta fill">
+        <span id="canvas-hint" class="dev-only">384×224 · compositeColorFrame preview: no-pack mono = red diagnostic ramp + stack depth 1 (emulator uses grayscale + depth 2)</span>
+        <span id="cursor-pos"></span>
+      </div>
+    </main>
+
+    <aside class="rail-right">
+      <div>
+        <p class="panel-title">Groups</p>
+        <div class="group-search">
+          <input type="search" id="group-search" placeholder="Search groups…" autocomplete="off" spellcheck="false"
+            title="Type part of a group's name (or folder); every word must match. Enter selects the first match, ↓ moves into the list, Esc clears. Ctrl+K jumps here." aria-label="Search groups" />
+          <span id="group-search-count" class="muted" aria-live="polite"></span>
+          <label class="group-on-frame" title="Show only the groups with tiles on the frame on screen (remembered in this browser)"><input type="checkbox" id="group-on-frame" /> On this frame</label>
+        </div>
+        <div class="groups-actions">
+          <button type="button" class="btn-ghost" id="btn-new-group-from-selection" disabled>New group from selection…</button>
+          <button type="button" class="btn-ghost" id="btn-new-pose-from-selection" disabled title="Capture the selected tiles as a pose: sprite (OBJ) tiles go to a sprite group, background or scaled (affine) tiles to a background group. Add it to an existing group or a new one.">New pose from selection…</button>
+          <button type="button" class="btn-ghost" id="btn-clear-group-filter" disabled title="Reset VIP world strip and layer dropdown to All">Clear view filters</button>
+        </div>
+        <p id="groups-pool-context-hint" class="muted dev-only" style="font-size:0.65rem;margin:0.15rem 0 0.35rem 0;line-height:1.35"></p>
+        <div class="groups-actions" style="margin-top:0.15rem">
+          <button type="button" class="btn-ghost" id="btn-select-unassigned-pool-tiles" hidden disabled title="Uses resolved pool row below; only groups on that row count as assigned">Select tiles not in any group (this pool)</button>
+          <button type="button" class="btn-ghost" id="btn-paint-inventory" disabled title="Every colour in this project and where it is stored — including ones no group can reach">Painted tiles…</button>
+        </div>
+        <div id="groups-tree" class="groups-tree" role="tree"></div>
+        <p class="panel-title" style="margin-top:0.65rem">Inspector</p>
+        <div class="group-detail" id="group-detail"></div>
+        <p class="muted dev-only" style="font-size:0.68rem;margin:0.35rem 0 0 0">Edit groups in memory; <strong>Save .vbpack</strong> writes <code>groups.json</code>. Pools with <strong>one</strong> variant show groups directly; multiple variants stay nested.</p>
+      </div>
+    </aside>
+
+    <dialog id="frame-details-dialog" aria-labelledby="frame-details-dialog-title">
+      <form id="frame-details-form">
+        <h2 id="frame-details-dialog-title">Frame details</h2>
+        <div id="frame-details-summary" class="membership-banner"></div>
+        <label>Name
+          <input type="text" id="frame-details-name" maxlength="120" placeholder="Defaults to the captured state, e.g. Level01 / MarioReady" />
+        </label>
+        <label>Tags
+          <input type="text" id="frame-details-tags" maxlength="400" placeholder="comma separated, e.g. boss, sprite, needs-colour" />
+        </label>
+        <p class="muted" style="font-size:0.65rem;margin:0;line-height:1.35">Names and tags are yours — the captured state name stays as it was. Tags are for finding frames later; a filter that uses them is coming.</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="frame-details-cancel">Cancel</button>
+          <button type="submit" class="btn-primary" id="frame-details-submit">Save details</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="new-group-dialog" aria-labelledby="new-group-dialog-title">
+      <form id="new-group-form">
+        <h2 id="new-group-dialog-title">New group from selection</h2>
+        <div id="new-group-membership" class="membership-banner" hidden></div>
+        <div id="new-group-overlap" class="overlap-banner" hidden></div>
+        <label>Name <input type="text" id="new-group-name" required maxlength="120" placeholder="e.g. Title screen HUD" /></label>
+        <label>Memory pool + variant
+          <select id="new-group-pool-variant"></select>
+        </label>
+        <p id="new-group-pool-hint" class="muted" style="font-size:0.68rem;margin:-0.2rem 0 0 0;line-height:1.45"></p>
+        <div class="dialog-row" role="group" aria-label="Group kind">
+          <span style="font-size:0.72rem;color:var(--muted)">Kind</span>
+          <label style="flex-direction:row;align-items:center;gap:0.25rem"><input type="radio" name="new-group-kind" id="new-group-kind-bg" value="bg" /> BG</label>
+          <label style="flex-direction:row;align-items:center;gap:0.25rem"><input type="radio" name="new-group-kind" id="new-group-kind-obj" value="obj" checked /> OBJ</label>
+          <button type="button" class="btn-ghost" id="new-group-suggest-kind" style="font-size:0.68rem;padding:0.2rem 0.4rem">Suggest from selection</button>
+        </div>
+        <p class="muted" style="font-size:0.65rem;margin:0;line-height:1.35">Groups store <strong>pattern hashes</strong> (+ world/layer), not screen positions — so every draw of those tiles on this frame is included (copies too). Overlap with existing groups is shown above. BG groups store a default <code>anchorHash</code> from the frontmost selected tile for VIP overlay / macro placement.</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="new-group-cancel" value="cancel">Cancel</button>
+          <button type="submit" class="btn-primary" id="new-group-submit">Create group</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="new-pose-dialog" aria-labelledby="new-pose-dialog-title">
+      <form id="new-pose-form">
+        <h2 id="new-pose-dialog-title">New sprite pose from selection</h2>
+        <div id="new-pose-summary" class="membership-banner"></div>
+        <div id="new-pose-warning" class="overlap-banner" hidden></div>
+        <label><span id="new-pose-target-label">Add to sprite group</span>
+          <input type="search" id="new-pose-target-filter" placeholder="Type to find a group…" autocomplete="off" spellcheck="false"
+            title="Filters the list as you type (name or folder). ↑/↓ pick, Enter adds the pose. No match offers a new group with that name." />
+          <select id="new-pose-target" size="7" aria-describedby="new-pose-target-note"></select>
+          <span id="new-pose-target-note" class="muted">Most recently used first</span>
+        </label>
+        <label id="new-pose-group-name-row" hidden><span id="new-pose-group-name-label">New sprite group name</span>
+          <input type="text" id="new-pose-group-name" maxlength="120" placeholder="e.g. Mario" />
+        </label>
+        <label>Pose name
+          <input type="text" id="new-pose-name" maxlength="120" placeholder="e.g. Walk 1 (defaults to Pose N)" />
+        </label>
+        <p id="new-pose-help" class="muted" style="font-size:0.65rem;margin:0;line-height:1.35">Only <strong>sprite (OBJ)</strong> tiles on the current eye are captured. Positions are stored relative to the <strong>anchor</strong> (the frontmost selected tile whose pattern appears only once in the pose), so the pose can be found wherever the sprite moves. Change the anchor later from the inspector.</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="new-pose-cancel">Cancel</button>
+          <button type="submit" class="btn-primary" id="new-pose-submit">Add pose</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="duplicate-group-dialog" aria-labelledby="duplicate-group-dialog-title">
+      <form id="duplicate-group-form">
+        <h2 id="duplicate-group-dialog-title">Duplicate group</h2>
+        <p id="dup-group-intro" class="muted" style="font-size:0.72rem;margin:0;line-height:1.45"></p>
+        <label>Memory pool + variant for the copy
+          <select id="dup-group-pool-variant" required></select>
+        </label>
+        <p id="dup-group-error" class="muted" style="font-size:0.7rem;margin:0;line-height:1.4;color:var(--accent-warm)" hidden></p>
+        <p class="muted" style="font-size:0.65rem;margin:0;line-height:1.35">The copy cannot use the <strong>same</strong> pool row as the original. Criteria and other fields are cloned; pick the capture / memory variant this duplicate should attach to.</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="dup-group-cancel">Cancel</button>
+          <button type="button" class="btn-primary" id="dup-group-confirm">Duplicate</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="import-pack-dialog" aria-labelledby="import-pack-title">
+      <form id="import-pack-form" method="dialog">
+        <h2 id="import-pack-title">Import from another pack</h2>
+        <p id="import-pack-intro" class="muted" style="font-size:0.72rem;margin:0;line-height:1.45"></p>
+        <div id="import-pack-summary" class="import-pack-summary"></div>
+        <fieldset id="import-pack-clash" class="import-pack-clash" hidden>
+          <legend id="import-pack-clash-legend">Where both packs have something different</legend>
+          <label><input type="radio" name="import-clash" value="mine" checked /> Keep this project’s</label>
+          <label><input type="radio" name="import-clash" value="theirs" /> Take the other pack’s</label>
+        </fieldset>
+        <p class="muted" style="font-size:0.65rem;margin:0;line-height:1.4">Nothing is removed from this project and the other pack is only read. Nothing is saved until you Save, so you can look first.</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="import-pack-cancel">Cancel</button>
+          <button type="button" class="btn-primary" id="import-pack-confirm">Import</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="frame-cleanup-dialog" aria-labelledby="frame-cleanup-title">
+      <form id="frame-cleanup-form" method="dialog">
+        <h2 id="frame-cleanup-title">Clean up frames</h2>
+        <p id="frame-cleanup-intro" class="muted" style="font-size:0.72rem;margin:0;line-height:1.45"></p>
+        <div class="frame-cleanup-tools">
+          <button type="button" class="btn-ghost" id="frame-cleanup-suggested">Select suggested</button>
+          <button type="button" class="btn-ghost" id="frame-cleanup-none">Select none</button>
+          <label class="muted">Show <select id="frame-cleanup-filter">
+            <option value="all">All frames</option>
+            <option value="done">Fully coloured</option>
+            <option value="tiles">With uncoloured tiles</option>
+            <option value="pixels">With uncoloured pixels</option>
+          </select></label>
+          <span id="frame-cleanup-count" class="muted" aria-live="polite"></span>
+        </div>
+        <div id="frame-cleanup-list" class="frame-cleanup-list"></div>
+        <p class="muted" style="font-size:0.65rem;margin:0;line-height:1.4">Frames a pose was captured from, or with a reference picture, stay. Paint is never touched, and auto-capture still counts what removed frames showed as captured. Nothing is saved until you Save.</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="frame-cleanup-cancel">Cancel</button>
+          <button type="button" class="btn-ghost" id="frame-cleanup-delete" disabled>Delete…</button>
+          <button type="button" class="btn-primary" id="frame-cleanup-archive" disabled title="Save the selected frames into a separate .vbpack, then take them out of this project">Archive…</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="save-progress-dialog" aria-labelledby="save-progress-title">
+      <form id="save-progress-form" method="dialog">
+        <h2 id="save-progress-title">Saving…</h2>
+        <div class="save-progress-bar" role="progressbar" aria-labelledby="save-progress-title"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="save-progress-bar">
+          <div class="save-progress-fill" id="save-progress-fill"></div>
+        </div>
+        <p class="save-progress-now" id="save-progress-now" aria-live="polite">Starting…</p>
+        <ol class="save-progress-steps" id="save-progress-steps"></ol>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="save-progress-close" hidden>Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="paint-inventory-dialog" aria-labelledby="paint-inventory-title">
+      <form id="paint-inventory-form" method="dialog">
+        <h2 id="paint-inventory-title">Painted tiles</h2>
+        <div id="paint-inventory-summary" class="membership-banner"></div>
+        <label style="font-size:0.72rem">Show
+          <select id="paint-inventory-filter">
+            <option value="frame" selected>Shows on this frame</option>
+            <option value="all">Everything painted</option>
+            <option value="orphan">No group can reach it</option>
+            <option value="pack">In the shared pack</option>
+            <option value="group">Owned by a group</option>
+          </select>
+        </label>
+        <div id="paint-inventory-list" class="paint-inventory-list"></div>
+        <p class="muted" style="font-size:0.65rem;margin:0;line-height:1.4">
+          A colour <strong>owned by a group</strong> only applies where that group's criteria match, so the same
+          pattern can differ per layer. An <strong>anchored overlay</strong> is painted by position rather than by
+          pattern, so it has one row for the whole group. A colour <strong>in the shared pack</strong> applies to
+          every copy of that pattern on every frame; when no group's criteria name it, nothing in the group panel
+          can clear it — use <strong>Clear</strong> here. Ctrl+Z undoes a clear; save the pack to keep it.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="paint-inventory-close">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="storage-dialog" aria-labelledby="storage-title">
+      <form method="dialog">
+        <h2 id="storage-title">Project storage</h2>
+        <div id="storage-body"></div>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="storage-close">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="game-states-dialog" aria-labelledby="game-states-title">
+      <form method="dialog">
+        <h2 id="game-states-title">Game states</h2>
+        <div id="game-states-body"></div>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="game-states-close">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="health-dialog" aria-labelledby="health-title">
+      <form method="dialog">
+        <h2 id="health-title">Check project</h2>
+        <div id="health-list"></div>
+        <div class="dialog-actions">
+          <button type="button" class="btn-ghost" id="health-close">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <footer class="bottom-strip dev-only">
+      <span>Reference strip — import / paste into group: <strong style="color:var(--muted)">planned</strong></span>
+      <span class="live-dot" id="live-preview">● Live preview</span>
+    </footer>
+  </div>
+  <p class="status-bar" id="status">No pack loaded.</p>
+
+  <script type="module" src="./painter.js"></script>
+</body>
+</html>

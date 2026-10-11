@@ -1,0 +1,6 @@
+{
+  "buildStart": 4,
+  "options": {
+    "defaultWebGL2": true
+  }
+}

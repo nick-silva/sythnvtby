@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sythnvtby Player</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;560;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/theme.css" />
+  <link rel="stylesheet" href="/src/player.css" />
+</head>
+<body>
+  <div class="player">
+    <header class="player-bar">
+      <h1 class="brand">sythnvtby <small>Player</small></h1>
+      <div class="player-files">
+        <label class="file-btn" title="The game's ROM (.vb). It is never copied into a play pack.">ROM… <input type="file" id="rom-input" accept=".vb,.bin" /></label>
+        <label class="file-btn" title="The colours for the game (.vbcplay), made with the sythnvtby Project tool: File ▸ Export for player…">Play pack… <input type="file" id="pack-input" accept=".vbcplay,.zip" /></label>
+      </div>
+      <div class="player-controls">
+        <button type="button" id="btn-colour" aria-pressed="true" title="Colour on or off (F9)">Colour</button>
+        <label class="view">View
+          <select id="view-select" title="3D: Side-by-side shows the left eye then the right; Anaglyph is for red/cyan glasses.">
+            <option value="2d">2D</option>
+            <option value="sidebyside">Side-by-side</option>
+            <option value="anaglyph">Anaglyph</option>
+          </select>
+        </label>
+        <button type="button" id="btn-pause" disabled title="Pause or resume (P)">Pause</button>
+        <button type="button" id="btn-fullscreen" title="Full screen (Esc leaves it)">Full screen</button>
+      </div>
+    </header>
+    <main class="player-stage" id="stage">
+      <div id="game"></div>
+      <div id="splash" class="splash">
+        <img class="splash-art" id="splash-art" src="/splash.webp" alt="sythnvtby" width="1344" height="784" />
+        <p id="splash-msg" class="splash-msg">Choose the game’s ROM and its play pack (.vbcplay).</p>
+        <div id="splash-actions" class="splash-actions"></div>
+      </div>
+    </main>
+    <p id="player-status" class="player-status" aria-live="polite"></p>
+  </div>
+  <script type="module" src="/src/player.js"></script>
+</body>
+</html>

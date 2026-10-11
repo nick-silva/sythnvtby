@@ -1,0 +1,5 @@
+# Shell scripts run inside Linux containers and need LF line endings.
+*.sh text eol=lf
+
+# Patches are applied with git apply inside Linux; CRLF corrupts them.
+*.patch text eol=lf

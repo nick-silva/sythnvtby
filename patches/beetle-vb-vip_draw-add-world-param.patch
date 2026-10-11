@@ -1,0 +1,54 @@
+--- a/mednafen/vb/vip_draw.inc
++++ b/mednafen/vb/vip_draw.inc
+@@ -6,7 +6,7 @@
+ #define BGM_OBJ 0x3
+ 
+ 
+-static void DrawBG(uint8 *target, uint16 RealY, bool lr, uint8 bgmap_base_raw, bool overplane, uint16 overplane_char, uint32 SourceX, uint32 SourceY, uint32 scx, uint32 scy, uint16 DestX, uint16 DestY, uint16 DestWidth, uint16 DestHeight)
++static void DrawBG(uint8 *target, uint16 RealY, bool lr, uint8 world, uint8 bgmap_base_raw, bool overplane, uint16 overplane_char, uint32 SourceX, uint32 SourceY, uint32 scx, uint32 scy, uint16 DestX, uint16 DestY, uint16 DestWidth, uint16 DestHeight)
+ {
+  int x;
+  const uint16 *CHR16 = CHR_RAM;
+@@ -109,7 +109,7 @@ static void DrawBG(uint8 *target, uint16 RealY, bool lr, uint8 bgmap_base_raw, bo
+ }
+ 
+-static void DrawAffine(uint8 *target, uint16 RealY, bool lr, uint32 ParamBase, uint32 BGMap_Base, bool OverplaneMode, uint16 OverplaneChar, uint32 scx, uint32 scy,
++static void DrawAffine(uint8 *target, uint16 RealY, bool lr, uint8 world, uint32 ParamBase, uint32 BGMap_Base, bool OverplaneMode, uint16 OverplaneChar, uint32 scx, uint32 scy,
+  uint16 DestX, uint16 DestY, uint16 DestWidth, uint16 DestHeight)
+ {
+  const uint16 *CHR16 = CHR_RAM;
+@@ -249,7 +249,7 @@ static void DrawAffine(uint8 *target, uint16 RealY, bool lr, uint32 ParamBase, uint3
+ static int obj_search_which;
+ 
+-static void DrawOBJ(uint8 *fb[2], uint16 Y, bool lron[2])
++static void DrawOBJ(uint8 *fb[2], uint16 Y, bool lron[2], uint8 world)
+ {
+  int32 oam;
+  const uint16 *CHR16 = CHR_RAM;
+@@ -318,7 +318,7 @@ static void DrawOBJ(uint8 *fb[2], uint16 Y, bool lron[2])
+  uint8 *fb[2] = { &fb_l[y * 512], &fb_r[y * 512] };
+ 
+  if(bgm == BGM_OBJ)
+- DrawOBJ(fb, (block_no * 8) + y, lron);
++ DrawOBJ(fb, (block_no * 8) + y, lron, (uint8)world);
+  else if(bgm == BGM_AFFINE)
+  {
+  for(lr = 0; lr < 2; lr++)
+@@ -326,7 +326,7 @@ static void DrawOBJ(uint8 *fb[2], uint16 Y, bool lron[2])
+  if(lron[lr])
+  {
+- DrawAffine(fb[lr], (block_no * 8) + y, lr, param_base, bgmap_base * 4096, over, overplane_char, scx, scy,
++ DrawAffine(fb[lr], (block_no * 8) + y, lr, (uint8)world, param_base, bgmap_base * 4096, over, overplane_char, scx, scy,
+  gx + (lr ? gp : -gp), gy, window_width, window_height);
+  }
+  }
+  }
+@@ -344,7 +344,7 @@ static void DrawOBJ(uint8 *fb[2], uint16 Y, bool lron[2])
+  if(bgm == 1) /* HBias */
+  srcX += (int16)DRAM[(param_base + (((RealY - DestY) * 2) | lr)) & 0xFFFF];
+ 
+- DrawBG(fb[lr], RealY, lr, bgmap_base, over, overplane_char, (int32)(int16)srcX, (int32)(int16)srcY, scx, scy, DestX, DestY, window_width, window_height);
++ DrawBG(fb[lr], RealY, lr, (uint8)world, bgmap_base, over, overplane_char, (int32)(int16)srcX, (int32)(int16)srcY, scx, scy, DestX, DestY, window_width, window_height);
+  }
+  }
+  }

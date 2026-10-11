@@ -1,0 +1,86 @@
+diff --git a/mednafen/vb/vip.c b/mednafen/vb/vip.c
+index 9edbc82..43786d7 100644
+--- a/mednafen/vb/vip.c
++++ b/mednafen/vb/vip.c
+@@ -1399,8 +1399,8 @@ v810_timestamp_t MDFN_FASTCALL VIP_Update(const v810_timestamp_t timestamp)
+                  var g = (typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : (typeof window !== 'undefined' ? window : {})));
+                  var w = (typeof window !== 'undefined' ? window : null);
+                  // Unconditional marker so the page can verify the patched core is running.
+-                 try { g.__VB_CORE_PATCH_LEVEL__ = 2; } catch (e) {}
+-                 try { if (w) w.__VB_CORE_PATCH_LEVEL__ = 2; } catch (e) {}
++                 try { g.__VB_CORE_PATCH_LEVEL__ = 3; } catch (e) {}
++                 try { if (w) w.__VB_CORE_PATCH_LEVEL__ = 3; } catch (e) {}
+ 
+                  // Phase 1: frame tick
+                  try {
+@@ -1421,7 +1421,7 @@ v810_timestamp_t MDFN_FASTCALL VIP_Update(const v810_timestamp_t timestamp)
+                      // Pull real VIP buffers from WASM memory (EmulatorJS exposes module as __VB_EJS_MODULE__).
+                      var M = (w && w.__VB_EJS_MODULE__) ? w.__VB_EJS_MODULE__ : ((g && g.__VB_EJS_MODULE__) ? g.__VB_EJS_MODULE__ : ((typeof Module !== 'undefined') ? Module : (g && g.Module ? g.Module : null)));
+                      var heap = (M && M.HEAPU8) ? M.HEAPU8 : null;
+-                     var st = {}; st.frameNumber = $0; st.eye = $1;
++                     var st = {}; st.frameNumber = $0; st.eye = $1; st.corePatchLevel = 3;
+                      if (heap) {
+                        // Pointers may arrive as signed ints; force to uint32 to avoid negative slice indexes.
+                        var pChr = ($2 >>> 0), nChr = ($3 >>> 0);
+diff --git a/mednafen/vb/vip_draw.inc b/mednafen/vb/vip_draw.inc
+index bad2dfa..f46f03f 100644
+--- a/mednafen/vb/vip_draw.inc
++++ b/mednafen/vb/vip_draw.inc
+@@ -44,6 +44,11 @@ static void DrawBG(uint8 *target, uint16 RealY, bool lr, uint8 bgmap_base_raw, b
+  if(start_x > final_x)
+   return;
+ 
++#ifdef __EMSCRIPTEN__
++ /* First drawn row of this world: rows with RealY - DestY in [0, DestHeight], clipped to the screen. */
++ const int32 vb_dl_first_row = ((int16)DestY < 0) ? 0 : (int16)DestY;
++#endif
++
+  /* Optimization: */
+  SourceY &= SourceY_Mask;
+  BGMap_Base |= (((SourceY >> 3) & 0x3F) * 0x40) | (((SourceY << 3) & ~0xFFF) << scx);
+@@ -72,15 +77,19 @@ static void DrawBG(uint8 *target, uint16 RealY, bool lr, uint8 bgmap_base_raw, b
+   char_sub_y = vflip_xor ^ (SourceY & 0x7);
+ 
+ #ifdef __EMSCRIPTEN__
+-  // Record one draw per tile: only when we're on the tile's "top" scanline in screen space for this tile.
+-  // We use char_sub_y==0 and SourceX aligned to tile boundary.
+-  if(char_sub_y == 0 && ((SourceX & 7) == 0))
++  // Record one draw per tile, on the first scanline and pixel of it that is actually drawn:
++  // its own top row / left column, or the window's first drawn row / column when the tile is
++  // cut by the top or left edge (or by the screen). Recording only on source row/column 0 lost
++  // cut tiles whose visible part the frame still shows. Position is the tile's true top-left
++  // on screen, which can be negative.
++  if(((SourceY & 7) == 0 || (int32)RealY == vb_dl_first_row) && ((SourceX & 7) == 0 || x == start_x))
+   {
+     uint8_t flags = 0;
+     if(bgsc & 0x2000) flags |= 1;
+     if(bgsc & 0x1000) flags |= 2;
+-    const int16_t y0 = (int16_t)RealY - (int16_t)(vflip_xor);
+-    VB_DL_Push((uint16_t)char_no, (int16_t)x, y0, flags, vb_dl_world, (uint8_t)lr, 0, (uint8_t)(palette_selector & 3), (uint8_t)(RealY >> 3));
++    const int16_t x0 = (int16_t)(x - (int32)(SourceX & 7));
++    const int16_t y0 = (int16_t)((int32)RealY - (int32)(SourceY & 7));
++    VB_DL_Push((uint16_t)char_no, x0, y0, flags, vb_dl_world, (uint8_t)lr, 0, (uint8_t)(palette_selector & 3), (uint8_t)(RealY >> 3));
+   }
+ #endif
+ 
+@@ -333,8 +342,9 @@ static void DrawOBJ(uint8 *fb[2], uint16 Y, bool lron[2])
+   pixels_save = CHR16[char_no * 8 + char_sub_y];
+ 
+ #ifdef __EMSCRIPTEN__
+-  // Record one draw per sprite tile per eye at top scanline (tile_y==0), so viewer can toggle L/R.
+-  if(tile_y == 0)
++  // Record one draw per sprite tile per eye, on its first drawn scanline: its top row, or the
++  // screen's first line when the sprite hangs off the top (tile_y > 0 at Y == 0).
++  if(tile_y == 0 || Y == 0)
+   {
+     uint8_t flags = 0;
+     if(oam_ptr[3] & 0x2000) flags |= 1;
+@@ -344,7 +354,7 @@ static void DrawOBJ(uint8 *fb[2], uint16 Y, bool lron[2])
+      if(!(jlron[lr] & lron[lr]))
+       continue;
+      const int32 x0 = sign_x_to_s32(10, (jx + (lr ? jp : -jp)));
+-     VB_DL_Push((uint16_t)char_no, (int16_t)x0, (int16_t)jy, flags, vb_dl_world, (uint8_t)lr, 2, (uint8_t)(palette_selector & 3), (uint8_t)(Y >> 3));
++     VB_DL_Push((uint16_t)char_no, (int16_t)x0, (int16_t)((int32)Y - (int32)tile_y), flags, vb_dl_world, (uint8_t)lr, 2, (uint8_t)(palette_selector & 3), (uint8_t)(Y >> 3));
+     }
+   }
+ #endif

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Color pack editor — sythnvtby</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui; margin: 0; padding: 0.5rem; background: #1a1a1a; color: #e0e0e0; }
+    h1 { font-size: 1.25rem; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+    .toolbar label { display: flex; align-items: center; gap: 0.25rem; }
+    .tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 2px; }
+    .tile-cell { width: 40px; height: 40px; cursor: pointer; border: 1px solid #444; image-rendering: pixelated; image-rendering: crisp-edges; }
+    .tile-cell.selected { border-color: #c0392b; box-shadow: 0 0 0 2px #c0392b; }
+    .tile-cell canvas { width: 100%; height: 100%; display: block; }
+    .sidebar { margin-top: 1rem; padding: 0.5rem; background: #252525; border-radius: 4px; max-width: 320px; }
+    .sidebar h3 { margin: 0 0 0.5rem 0; font-size: 0.875rem; }
+    .sidebar input[type=color] { width: 48px; height: 28px; padding: 0; border: none; cursor: pointer; }
+    .sidebar button { margin-right: 0.5rem; margin-top: 0.5rem; padding: 0.35rem 0.75rem; background: #c0392b; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .sidebar button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #game-id { width: 12rem; padding: 0.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Color pack editor</h1>
+  <div class="toolbar">
+    <label>Tile manifest: <input type="file" id="manifest-input" accept=".json" /></label>
+    <label>Game ID: <input type="text" id="game-id" placeholder="e.g. mario-clash" /></label>
+    <button type="button" id="btn-export" disabled>Export .vbcolor</button>
+  </div>
+  <div id="grid-container"></div>
+  <div class="sidebar" id="sidebar" style="display: none;">
+    <h3>Selected tile</h3>
+    <label>Color: <input type="color" id="tile-color" value="#e74c3c" /></label>
+    <button type="button" id="btn-apply">Apply to tile</button>
+  </div>
+
+  <script type="module" src="./editor.js"></script>
+</body>
+</html>

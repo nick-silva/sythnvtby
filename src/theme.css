@@ -1,0 +1,56 @@
+/* Shared look for the emulator, Painter v2, and the tools hub. Page stylesheets map their own variables onto these tokens. */
+:root {
+  --bg0: #121214;
+  --bg1: #1a1a1e;
+  --surface: #222228;
+  --surface-2: #2a2a32;
+  --surface-glass: rgba(26, 26, 30, 0.82);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #e8e6e3;
+  --muted: #9a9690;
+  --accent: #c0392b;
+  --accent-dim: #8e2a20;
+  --accent-soft: rgba(192, 57, 43, 0.16);
+  --accent-text: #f0a090;
+  --cyan: #5eb8a8;
+  --cyan-soft: rgba(94, 184, 168, 0.12);
+  --focus: #e8a060;
+  --font-sans: Outfit, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--text);
+  background:
+    radial-gradient(ellipse 90% 55% at 12% -10%, rgba(192, 57, 43, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 95% 15%, rgba(94, 184, 168, 0.08), transparent 50%),
+    linear-gradient(165deg, var(--bg0) 0%, var(--bg1) 48%, #16161a 100%);
+  background-color: var(--bg0);
+  background-attachment: fixed;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
