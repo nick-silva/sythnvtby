@@ -1,6 +1,6 @@
 ---
 status: current
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-11
 covers: src/pixel-explain.js, src/project-health.js, src/sub-state-learn.js, src/game-states.js, src/memory-questions.js, src/memory-recorder.js, src/memory-panel.js, src/project-storage.js, tools/painter/game-states-panel.js, tools/painter/storage-panel.js, src/screen-gate.js, src/group-order.js, tools/painter/health-panel.js, src/recovery.js, src/work-journal.js, index.html, src/main.js, src/frame-capture.js, src/auto-capture.js, src/frame-step.js, tools/index.html, tools/project.html, tools/painter.js, tools/painter/, tools/painter/sprite-profiles-ui.js, tools/sprite-studio.html, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/art-pack.js, src/group-folders.js, src/group-screens.js, src/layer-art.js, src/paint-gaps.js, src/project-journal.js, src/frame-numbers.js, src/starter-paint.js
 ---
 
@@ -751,15 +751,28 @@ its edges. It's the nicest place to paint characters.
   - **Onion** ghosts other poses over this one. The menu beside it picks which: **Previous &
     next** (faint, behind this pose) or any one pose, drawn **on top** and lined up on its anchor
     tile so it sits over this pose even when the two come from different frames. Choosing a pose
-    turns Onion on. **Opacity** sets how strong the ghost is (remembered in this browser).
+    turns Onion on. **Opacity** sets how strong the ghost is (remembered in this browser). The menu and Opacity show only while Onion is on, as Original's Opacity does while Original is on.
+  - **Original** draws this pose's original picture (the game's monochrome, in greys, with no
+    paint) over your paint, lined up pixel for pixel. Use it to check colours filled in bulk: at a
+    low **Opacity** you see it through the paint; **hold O** to flip to it at full strength and
+    let go to see your paint again. Brush and Eraser keep painting underneath.
   - **Behind** sets the backdrop color. It defaults to hot pink so dark edges show.
   - **Flip ↔ ↕** mirrors the view only. Stored paint keeps its original orientation.
 - **Tool rail (right of the stage):** **Look (V)**, **Brush (B)**, **Eraser (E)**, **Fill (G)**,
-  **Swap (S)**, **Pick (I)**, **Clone (C)**, **Paint on: Tiles / Overpaint (T)** and **Show overpaint**
+  **Swap (S)**, **Pick (I)**, **Clone (C)**, **Auto-paint (A)**, **Paint on: Tiles / Overpaint (T)** and **Show overpaint**
   for background groups, **Size**, the color box, a **Palette** of colors you've used, **Undo**
   (Ctrl+Z), **Redo** (Ctrl+Shift+Z or Ctrl+Y), and **Clear…**. The **Eraser** takes paint off the
   pixels you drag over: on tiles the game's own picture shows there again (a tile with nothing left
   counts as unpainted), on an overpaint the layer beneath shows through.
+  - **Auto-paint (A)** colours a group's unpainted poses from poses you have painted. It opens a
+    window listing every pose with how much of it is painted: tick **Learn from** on the poses to
+    take colours from (it starts with the fully painted ones) and **Paint** on the poses to colour
+    (it starts with all the rest), then **Auto-paint**. A bar shows its progress; **Stop** ends it
+    with nothing changed. It matches each pixel by what surrounds it, not by position, so poses
+    don't have to line up — but a pose learns best from poses facing the same way, so paint one
+    side view before auto-painting the other side views. Only pixels nobody chose a colour for are
+    painted, a reference pose's tiles are never touched, and one **Undo** takes the whole run back.
+    Check the result with **Original** (hold O) and fix it with the Eraser and Brush.
   - **Clear…** works on the pose or card you're looking at. Colour is stored per tile pattern, so
     it asks: **Clear this pose only** (the tiles no other pose or card of the group uses; shared
     tiles keep their colour everywhere) or **Clear all, shared tiles too** (the other poses lose
@@ -867,6 +880,12 @@ Things to know:
     **Move this overpaint to this pose** hands a pose the picture you already painted.
   - On a pose's card the panel reads **Overpaint · this pose (…)**; **Remove** there removes just
     that picture, and Undo takes a Move back. Pose pictures never hide the layer's tiles.
+  - **Drawing on this card**, at the top of the panel, lists what actually draws on the card on
+    stage: *this pose's own picture*, *the group's all-poses picture*, both, or *no overpaint*.
+    A character's all-poses picture (often left from before pose pictures) is marked in orange —
+    it shows on every pose — with **Move it to this pose** and **Remove the all-poses picture**
+    right there, whichever way the panel is painting. Pose cards with a picture of their own carry
+    a small ◩ in the filmstrip.
   - Packs saved with the older one-group-per-pose version are folded into their group when
     SpriteStudio opens them, and older pose pictures are tied to their saved poses (save to keep
     it). The Project tool lists a group's pose pictures in its details.
@@ -939,7 +958,11 @@ across all its tiles and poses at once, including copies you can't see on this f
 
 ### Coloring a sprite across all its poses
 
-1. Arrive from the Project tool with **SpriteStudio →**. Your sprite is pre-selected.
+1. Arrive from the Project tool with **SpriteStudio →**. Your sprite is pre-selected — unless a
+   saved pose on the frame you were on still has pixels nothing colours: then SpriteStudio opens
+   that pose (one of your selected group's first, if it has one there) and the status bar says how
+   many pixels are left and how many other poses on that frame need paint. **Show: With uncoloured
+   pixels** in the Project tool's frame list finds those frames.
 2. Look through the filmstrip. Delete duplicate or broken poses with the **×** on the card,
    or press **Delete**. The tile patterns only that pose used leave the group with it, along with
    their paint, so they stop painting where the game shows them; tiles other poses share keep
@@ -1207,6 +1230,8 @@ The tools print a lot of internal vocabulary. Here it is in plain terms.
 | **Animated tiles** | Backgrounds the game animates by redrawing tiles, such as twinkling stars. It's a group option in the Project tool. |
 | **Follow the game's palette** | A group option: paint brightens and dims with the palette the game draws each tile with, so a menu's selected option stays bright and the rest dim. See [Menus that highlight with the palette](#menus-that-highlight-with-the-palette). |
 | **Onion** | Ghosts of the neighbouring poses in SpriteStudio. |
+| **Original** | A pose's monochrome picture as the game draws it, shown over the paint in SpriteStudio (hold O). |
+| **Auto-paint** | SpriteStudio colouring a group's unpainted poses from the poses you painted (A). |
 
 ---
 

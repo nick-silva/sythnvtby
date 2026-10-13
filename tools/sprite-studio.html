@@ -197,6 +197,8 @@
       color: var(--muted);
     }
     .stage-toolbar label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+    /* Onion's menu and the opacity sliders show only while their toggle is on. */
+    .stage-toolbar [hidden] { display: none !important; }
     .canvas-wrap {
       flex: 1;
       display: flex;
@@ -280,6 +282,17 @@
     .pose-card.active .pose-delete,
     .pose-card .pose-delete:focus-visible { opacity: 1; }
     .pose-card .pose-delete:hover { background: var(--accent); border-color: var(--accent); color: var(--text); }
+    /* A pose with its own overpaint picture. */
+    .pose-card .pose-picture-mark {
+      position: absolute;
+      top: 0.1rem;
+      left: 0.15rem;
+      font-size: 0.75rem;
+      line-height: 1;
+      color: #f0b429;
+      text-shadow: 0 0 2px #000;
+      pointer-events: none;
+    }
 
     /* The stage row: canvas, then the paint tools docked on its right. The top toolbar keeps
        view-wide settings; everything that changes pixels lives here. */
@@ -378,6 +391,15 @@
     .recovered-row button { font-size: 0.66rem; padding: 0.12rem 0.4rem; }
     .touch-up-panel h3 { margin: 0 0 0.3rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: #f0b429; }
     .touch-up-panel p { margin: 0 0 0.4rem; font-size: 0.66rem; line-height: 1.35; }
+    /* What draws on the card on stage, at the top of the Overpaint panel. */
+    .overpaint-on-pose { margin: 0 0 0.5rem; padding: 0.35rem 0.45rem; border-radius: 4px; background: var(--surface-2); }
+    .touch-up-panel .overpaint-on-pose-title { margin: 0 0 0.2rem; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .overpaint-on-pose ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.35rem; }
+    .overpaint-on-pose li { font-size: 0.66rem; line-height: 1.35; padding-left: 0.45rem; border-left: 3px solid var(--border-strong); }
+    .overpaint-on-pose li.pose { border-left-color: #f0b429; }
+    .overpaint-on-pose li.warn { border-left-color: #ff6b3d; color: #ffb59c; }
+    .overpaint-on-pose li.none { color: var(--muted); }
+    .overpaint-on-pose li .layer-art-actions { margin-top: 0.25rem; }
 
     .tracks { margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.45rem; }
     .section-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.62rem; color: var(--muted); }
@@ -481,6 +503,41 @@
     #clear-paint-dialog h2 { margin: 0; font-size: 0.85rem; font-weight: 600; }
     #clear-paint-dialog p { margin: 0; font-size: 0.74rem; line-height: 1.4; }
     #clear-paint-shared { margin: 0; padding-left: 1.1rem; font-size: 0.7rem; color: var(--muted); }
+    #autopaint-dialog {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0;
+      background: var(--surface);
+      color: var(--text);
+      width: min(96vw, 44rem);
+    }
+    #autopaint-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+    #autopaint-dialog form { padding: 0.65rem 0.75rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    #autopaint-dialog h2 { margin: 0; font-size: 0.85rem; font-weight: 600; }
+    #autopaint-dialog p { margin: 0; font-size: 0.74rem; line-height: 1.4; }
+    .autopaint-quick { font-size: 0.72rem; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+    .autopaint-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+      gap: 0.4rem;
+      max-height: min(55vh, 28rem);
+      overflow-y: auto;
+      padding: 0.1rem;
+    }
+    .autopaint-pose {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.3rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface-2);
+      font-size: 0.7rem;
+    }
+    .autopaint-pose canvas { width: 100%; height: 4.5rem; object-fit: contain; image-rendering: pixelated; }
+    .autopaint-name { font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .autopaint-share { color: var(--muted); }
+    .autopaint-actions { display: flex; justify-content: flex-end; gap: 0.4rem; }
     .clear-paint-actions { display: flex; flex-direction: column; gap: 0.35rem; }
     .clear-paint-actions button { text-align: left; }
     .save-progress-bar {
@@ -569,7 +626,9 @@
         <select id="onion-pose" title="Which pose to ghost: the previous and next (behind this one), or one pose of your choice (on top, lined up on its anchor tile)" aria-label="Onion skin pose">
           <option value="">Previous &amp; next</option>
         </select>
-        <label title="Onion skin opacity">Opacity <input type="range" id="onion-alpha" min="0.05" max="1" step="0.05" value="0.35" aria-label="Onion skin opacity" /></label>
+        <label id="onion-alpha-label" title="Onion skin opacity">Opacity <input type="range" id="onion-alpha" min="0.05" max="1" step="0.05" value="0.35" aria-label="Onion skin opacity" /></label>
+        <label title="Show the pose's original picture — the game's monochrome, with no paint — over your paint, to check colours filled in bulk against it. Hold O to flip to it at full strength. Brush and Eraser still paint underneath."><input type="checkbox" id="toggle-original" /> Original</label>
+        <label id="original-alpha-label" title="Original picture opacity: low to see it through your paint, full to compare by switching it on and off">Opacity <input type="range" id="original-alpha" min="0.05" max="1" step="0.05" value="0.5" aria-label="Original picture opacity" /></label>
         <label title="Tiles with no paint show in red, as in the Project tool (the game shows them as the original picture). Pixels of painted tiles still on a starting grey are tinted red: the game shows that grey. Hover one to see which."><input type="checkbox" id="toggle-unpainted" checked /> Show unpainted</label>
         <label title="While you paint a group, show only its own paint on its tiles — not colours another group (or the shared pack) gives the same tile patterns in the game. Unpainted tiles look unpainted. Turn off to see what the game shows."><input type="checkbox" id="toggle-own-paint" checked /> Only this group's paint</label>
         <label id="base-tiles-label" hidden title="A scaled (affine) group: show its tiles unscaled, as they sit in the game's background map, and paint them there. Paint is per tile pattern, so every scaled copy follows."><input type="checkbox" id="toggle-base-tiles" /> Base tiles</label>
@@ -601,6 +660,7 @@
             <button type="button" id="btn-tool-swap" title="Swap — click a colour, and every pixel of this group's tiles showing it takes the brush colour, across all its tiles and poses at once (S)"><span class="glyph" aria-hidden="true">⇄</span>Swap<kbd>S</kbd></button>
             <button type="button" id="btn-tool-pick" title="Pick — take the colour under the pointer, and say what colours that pixel in the game or why nothing does (I)"><span class="glyph" aria-hidden="true">⊙</span>Pick<kbd>I</kbd></button>
             <button type="button" id="btn-tool-clone" title="Clone — paint with whatever colour the reference holds at each pixel (C)"><span class="glyph" aria-hidden="true">⧉</span>Clone<kbd>C</kbd></button>
+            <button type="button" id="btn-autopaint" title="Auto-paint — colour this group's unpainted poses from poses you have painted. Opens a window to pick which poses to learn from and which to paint. (A)"><span class="glyph" aria-hidden="true">✦</span>Auto-paint<kbd>A</kbd></button>
           </div>
           <div class="paint-on" id="paint-on" role="group" aria-label="Paint on" title="Where brush strokes go. Tiles: the tile's colours, shared by every copy of it. Overpaint: a picture pinned to this layer, over the tiles — blank and transparent pixels too — shown wherever the layer is on screen.">
             <div class="tool-section-label">Paint on</div>
@@ -622,7 +682,7 @@
             </select>
           </label>
           <div class="tool-colour">
-            <input type="color" id="paint-color" value="#e05050" aria-label="Paint colour" title="Paint colour" />
+            <input type="color" id="paint-color" value="#3fa7ff" aria-label="Paint colour" title="Paint colour" />
           </div>
           <div class="tool-section-label">Palette</div>
           <div id="palette"><p class="empty">Painted colours show up here.</p></div>
@@ -717,6 +777,28 @@
         <button type="button" id="clear-paint-cancel">Cancel</button>
       </div>
       <p class="empty">Colour is stored per tile pattern, so a tile shared with another pose can only lose its colour everywhere. Undo brings it back; it is written to the pack only when you save.</p>
+    </form>
+  </dialog>
+
+  <dialog id="autopaint-dialog" aria-labelledby="autopaint-title">
+    <form id="autopaint-form" method="dialog">
+      <h2 id="autopaint-title">Auto-paint</h2>
+      <p>Colours the poses ticked <b>Paint</b> from the poses ticked <b>Learn from</b>. Only pixels nobody chose a colour for are painted, and one Undo takes it all back. A pose learns best from poses facing the same way: a side view from a side view.</p>
+      <div class="autopaint-quick">
+        Learn from <button type="button" id="autopaint-refs-painted">painted poses</button>
+        · Paint <button type="button" id="autopaint-targets-rest">all the rest</button>
+        <button type="button" id="autopaint-targets-none">none</button>
+      </div>
+      <div class="autopaint-list" id="autopaint-list"></div>
+      <div class="save-progress-bar" role="progressbar" aria-labelledby="autopaint-title"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="autopaint-bar">
+        <div class="save-progress-fill" id="autopaint-fill"></div>
+      </div>
+      <p class="save-progress-now" id="autopaint-now" aria-live="polite"></p>
+      <div class="autopaint-actions">
+        <button type="button" id="autopaint-cancel">Cancel</button>
+        <button type="button" id="autopaint-run" class="primary">Auto-paint</button>
+      </div>
     </form>
   </dialog>
 

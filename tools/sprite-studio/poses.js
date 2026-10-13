@@ -11,7 +11,7 @@ import { shadeRampFromPaint } from '../../src/shade-ramp.js';
 import { animationPhases, patternBytesFinder } from '../shared/animated-tiles.js';
 import { isObjGroup, removePoseFromGroup, patternsInNoPose, patternsOnlyInPose, withoutPatterns, unclaimedPatterns, poseMoveTargets, movePoseBetweenGroups, updatePose, addPoseToGroup, buildPoseFromView, nextPoseId, LEGACY_POSE_ID } from '../../src/obj-sprite-profiles.js';
 import { layerArtOf } from '../../src/layer-art.js';
-import { artTarget, overpaintMode, posePictureCanStart, resetPaintOn, selectedArt, syncPaintOnUi } from './overpaint.js';
+import { artTarget, overpaintMode, posePictureCanStart, posePictureForView, resetPaintOn, selectedArt, syncPaintOnUi } from './overpaint.js';
 import { markActiveRow, renderSpriteLists } from './group-list.js';
 import { currentTracks, renderTracksPanel } from './tracks.js';
 import { refreshActiveReference } from './reference.js';
@@ -498,6 +498,14 @@ export function renderStrip() {
     label.className = 'label';
     label.textContent = view.pose.name || view.pose.poseId;
     card.append(thumb, label);
+    if (posePictureForView(view)) {
+      const mark = document.createElement('span');
+      mark.className = 'pose-picture-mark';
+      mark.textContent = '◩';
+      mark.title = 'This pose has its own overpaint, shown only when this whole pose is on screen';
+      mark.setAttribute('aria-label', mark.title);
+      card.append(mark);
+    }
     const stored = storedPose(view.pose);
     if (canDelete && isDeletablePose(stored)) {
       const del = document.createElement('button');

@@ -653,7 +653,16 @@ export function clearOverpaint() {
 }
 
 export function removeOverpaint() {
-  const target = artTarget();
+  removePicture(artTarget());
+}
+
+/**
+ * Remove one picture: a pose's own, or the group's (its all-poses picture on a character). Takes the
+ * picture explicitly, so the group's picture can go from a card painting this pose only, where the
+ * Overpaint tools aim at the pose instead.
+ * @param {any} target the group, or a pose picture as posePictureGroups gives it
+ */
+export function removePicture(target) {
   if (!target || !layerArtOf(target)) return;
   const what = target.posePictureId ? `this pose’s own overpaint (“${target.name}”)` : `“${target.name || target.id}”’s overpaint`;
   if (!window.confirm(`Remove ${what}? Its tile paint stays. Undo brings it back; nothing is written until you save.`)) return;
@@ -671,11 +680,93 @@ export function removeOverpaint() {
 
 /** The selected group's patterns the card on stage shows: what "this pose" is. */
 export function stagePosePatterns() {
-  const view = ctx.poseViews[ctx.poseIndex];
+  return viewPosePatterns(ctx.poseViews[ctx.poseIndex]);
+}
+
+/** The selected group's patterns a card shows (any card of the filmstrip). */
+export function viewPosePatterns(view) {
   if (!view || view.base || !ctx.selectedGroup) return [];
   const shown = Array.isArray(view.patterns) ? view.patterns : (view.pose?.tiles || []).map((t) => t.hash);
   const own = new Set((ctx.selectedGroup.criteria?.hashes || []).map((h) => Number(h) >>> 0));
   return [...new Set(shown.map((h) => Number(h) >>> 0))].filter((h) => !own.size || own.has(h));
+}
+
+/** A card's own pose picture in the selected group, or null (the filmstrip marks cards that have one). */
+export function posePictureForView(view) {
+  const group = ctx.selectedGroup;
+  if (!group || isObjGroup(group) || group.wholePose === true || !Array.isArray(group.poseOverpaints) || !group.poseOverpaints.length) return null;
+  const poseId = posesOf(group).some((p) => p.poseId === view?.pose?.poseId) ? view.pose.poseId : undefined;
+  return posePictureFor(group, viewPosePatterns(view), poseId);
+}
+
+/** "1,234 px painted" for a picture, from its pixels. */
+function paintedPixelsText(target) {
+  const px = target ? layerArtPixels(target) : null;
+  if (!px) return 'loading';
+  let n = 0;
+  for (let i = 3; i < px.data.length; i += 4) if (px.data[i]) n++;
+  return n ? `${n.toLocaleString()} px painted` : 'nothing painted';
+}
+
+/**
+ * The top of the Overpaint panel: which pictures draw on the card on stage — the pose's own, the
+ * group's (on a character, its all-poses picture, flagged: it shows on every pose), both or none —
+ * each with what can be done to it right there. The group's picture can always be moved to this
+ * pose or removed from here, whichever scope the panel is painting in.
+ * @param {any} group @param {(id: string, label: string, title: string, onClick: () => void) => HTMLButtonElement} button
+ * @returns {HTMLElement | null}
+ */
+export function onThisPosePart(group, button) {
+  if (!group || isObjGroup(group) || group.wholePose === true) return null;
+  const wrap = document.createElement('div');
+  wrap.id = 'overpaint-on-pose';
+  wrap.className = 'overpaint-on-pose';
+  const title = document.createElement('p');
+  title.className = 'overpaint-on-pose-title';
+  title.textContent = 'Drawing on this card';
+  const list = document.createElement('ul');
+  const item = (text, className = '') => {
+    const li = document.createElement('li');
+    li.className = className;
+    const span = document.createElement('span');
+    span.textContent = text;
+    li.append(span);
+    list.append(li);
+    return li;
+  };
+  const posePicture = stagePosePicture();
+  const groupArt = layerArtOf(group);
+  const character = isPoseCharacter(group);
+  if (posePicture) {
+    const drawn = posePictureGroups(group).find((p) => p.posePictureId === posePicture.id);
+    item(`This pose’s own picture (${drawn?.poseName || posePicture.name || posePicture.id}): ${paintedPixelsText(drawn)}, shown only on this pose.`, 'pose');
+  }
+  if (groupArt) {
+    const n = posesOf(group).length;
+    const li = item(
+      character
+        ? `The group’s all-poses picture: ${paintedPixelsText(group)}, shown on all ${n} poses — this one and every other.`
+        : `The group’s picture: ${paintedPixelsText(group)}, shown wherever this layer is on screen.`,
+      character ? 'warn' : '',
+    );
+    const row = document.createElement('div');
+    row.className = 'layer-art-actions';
+    if (character && !posePicture && stagePosePatterns().length) {
+      row.append(button('btn-overpaint-move-to-pose', 'Move it to this pose', 'Make the all-poses picture this pose’s own, so it stops showing on the other poses', () => overpaintThisPose(true)));
+    }
+    row.append(
+      button(
+        'btn-overpaint-remove-group',
+        character ? 'Remove the all-poses picture' : 'Remove it',
+        'Drop the group’s picture. Tile paint and pose pictures stay; Undo brings it back.',
+        () => removePicture(group),
+      ),
+    );
+    li.append(row);
+  }
+  if (!posePicture && !groupArt) item('No overpaint: only tile paint.', 'none');
+  wrap.append(title, list);
+  return wrap;
 }
 
 /**
@@ -1219,15 +1310,8 @@ export function overpaintPosePart(group, target, button) {
   if (!stagePosePatterns().length) return null;
   // A character painting all poses has the scope switch above; Move still applies.
   const hasArt = !!layerArtOf(group);
-  if (isPoseCharacter(group)) {
-    if (!hasArt) return null;
-    const row = document.createElement('div');
-    row.className = 'layer-art-actions';
-    row.append(button('btn-overpaint-move-pose', 'Move this overpaint to this pose', 'Make this picture the pose on stage’s own, so it stops showing on the other poses', () => overpaintThisPose(true)));
-    p.textContent = `This overpaint shows on every pose of this group${poses ? `; ${poses} pose${poses === 1 ? ' has' : 's have'} a picture of its own too` : ''}.`;
-    wrap.append(p, row);
-    return wrap;
-  }
+  // A character's all-poses picture is listed, with Move and Remove, at the top of the panel.
+  if (isPoseCharacter(group)) return null;
   p.textContent = `${hasArt ? 'This overpaint shows on every pose of this group. ' : ''}To paint one pose only, give it a picture of its own${poses ? ` (${poses} pose${poses === 1 ? ' has' : 's have'} one)` : ''}.`;
   const row = document.createElement('div');
   row.className = 'layer-art-actions';

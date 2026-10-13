@@ -1,6 +1,6 @@
 ---
 status: living
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 ---
 
 # Priorities and what's next
@@ -46,6 +46,8 @@ toolset ([below](#toolset-review-oct-7-2026)).
 | 17 | **Palette as a group criterion**; **SpriteStudio stage rethink** ([SpriteStudio — rethink the UX](#spritestudio--rethink-the-ux-sep-2026)) | UX | M | Only when a case needs it / a design question to settle first. |
 | 18 | **Retire old formats** and **one per-frame pattern cache** ([Code health 6–7](#code-health-review-oct-7-2026)) | Code | M | Worth it once 11 exists. |
 | 19 | **Libretro compatibility** — the whole system usable with the libretro project: a sythnvtby libretro core that colours inside the core, packs found the libretro way, our core patches upstream-ready ([Libretro compatibility](#libretro-compatibility-backlogged-oct-10-2026)) — **backlogged Oct 10, not started** | Feature | M–L | The licence blocker is gone (GPL-3.0-or-later, Oct 10). Best after C1 ([refactor-plan.md](refactor-plan.md)), so the core and the browser share one session model and one compositor. |
+
+| 20 | **Colour a group's poses from the ones you painted** ([Auto-colouring](#auto-colouring-backlogged-oct-11-2026)) — the Oct 10 whole-game try (capture bot + rules-based colourer) was not good enough; ~~**Auto-paint**~~ **built Oct 11** (`src/pose-autopaint.js`, SpriteStudio *Auto-paint (A)*): paint a few poses, pick which to learn from and which to paint, and each unpainted pixel takes the colour of the reference pixels whose surroundings match best (Yoshi-PlayingAs: 35 poses from 2 in ~4 s). With it: **Original** (hold O) to check against the game's monochrome. Left: the capture bot as a tool, suggesting which pose to paint next | Feature | M | Built Oct 11 for sprite and character poses; backgrounds and menus are not covered. |
 
 The rest of this file keeps its own order inside each section; this table decides between them.
 
@@ -799,6 +801,43 @@ console-specific port.
 - Only playback moves; the authoring tools stay in the browser (unless item 5 above says otherwise).
 - **Order:** after C1 (one project session, [refactor-plan.md](refactor-plan.md)) and ideally C2 (the
   staged compositor mirrored in C++), so the core reuses one well-tested model.
+
+### Auto-colouring (backlogged Oct 11 2026)
+
+**Backlogged, not started** (backlog #20). On Oct 10 the user asked Claude to colour the rest of
+Mario's Tennis itself. The attempt, kept outside the repo in `MarioTennis\auto\` (a separate pack;
+the user's pack untouched; scripts in `auto\tools\`):
+
+- **Capture bot:** Playwright drives the emulator page — picks matchups in the menu, plays with
+  random input, and lets auto-capture stop on new tiles (974 frames in ~1 hour; periodic capture
+  once the page slowed at ~1,000 frames).
+- **Rules-based colourer:** per character, split each pose into areas along its white outlines, name
+  each area by where it sits (crown, hair, dress…), its shade and texture, map shades through that
+  area's ramp, and let every pattern pixel take the colour it got most often across all poses.
+  Opponents are coloured on their unscaled affine source rebuilt from the map cells sampled.
+- **Result:** 94% of lit pixels coloured on new match frames, but the user judged the quality not
+  good enough: tinted rackets, faces taking hair colour, shell plates split, no Doubles partner.
+
+**Worth keeping regardless:** the capture bot (as a tool: "play this matchup and capture what is
+new"), and one finding — the InGame screen recipe (WRAM byte 0 == 48) matches only ~20% of match
+frames, which hid KoopaBackground's paint (fixed in the auto copy only).
+
+**To decide before resuming:** iterate on the rules with the user's eye on each character; or
+start from reference art (per-pixel voting, as VBoyColor does); or colour one pose per character
+properly and propagate.
+
+**Oct 11 — the last one, built as Auto-paint.** Tested on Yoshi-PlayingAs first (2 painted poses →
+35 filled; 64–79% of pixels right when one view predicts the opposite view, much better between
+poses facing the same way). It matches each pixel by the mix of shades around it at several sizes,
+its depth inside the sprite and its height, lets neighbours vote, folds small specks into what
+surrounds them, and gives each pattern pixel the colour most poses chose. It never repaints a
+chosen colour or a reference pose's tiles, and one Undo takes a run back.
+
+**Also Oct 11–13 (SpriteStudio):** *Original* view and hold O; the Overpaint panel's *Drawing on
+this card*, with Move/Remove for a character's all-poses picture from any card; ◩ on cards with a
+pose picture; arriving from the Project tool opens the pose on that frame that still needs paint
+(`tools/shared/poses-needing-paint.js`); tool keys work after using the toolbar; Onion and Original
+controls show only while on; the default paint colour is blue, not a red that looks unpainted.
 
 ---
 

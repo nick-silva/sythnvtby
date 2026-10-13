@@ -12,7 +12,7 @@ import { restorePicture, bestPlacement, confidentPlacement, pngSize } from '../.
 import { touchUpOf, touchUpKey } from '../../src/touch-up.js';
 import { copyPixels } from '../../src/layer-art-edit.js';
 import { getWindowsTableBytesFromState } from '../../src/vip-world-clip.js';
-import { artTarget, clearOverpaint, copyPicture, coverWholeLoop, exportPicture, fillArtScreenHeight, framesPastPicture, groupScreensNote, isPoseCharacter, overpaintMode, overpaintPosePart, overpaintScope, overpaintThisPose, pastePictureFromClipboard, pictureStore, removeOverpaint, setHideTiles, setOverpaintScope, setPaintOn, sourceState, stagePosePatterns, usePictureImage } from './overpaint.js';
+import { artTarget, clearOverpaint, copyPicture, coverWholeLoop, exportPicture, fillArtScreenHeight, framesPastPicture, groupScreensNote, isPoseCharacter, onThisPosePart, overpaintMode, overpaintPosePart, overpaintScope, pastePictureFromClipboard, pictureStore, removeOverpaint, setHideTiles, setOverpaintScope, setPaintOn, sourceState, stagePosePatterns, usePictureImage } from './overpaint.js';
 import { renderSpriteLists } from './group-list.js';
 
 /** SpriteStudio's state and functions this part uses (tools/sprite-studio.js passes them in). */
@@ -201,7 +201,10 @@ export function overpaintPanelBody(group) {
     b.addEventListener('click', onClick);
     return b;
   };
-  box.append(h, note);
+  box.append(h);
+  const onPose = onThisPosePart(group, button);
+  if (onPose) box.append(onPose);
+  box.append(note);
   const character = isPoseCharacter(group);
   const scopeButton = () =>
     overpaintScope(group) === 'pose'
@@ -214,14 +217,8 @@ export function overpaintPanelBody(group) {
     note.textContent = `This pose has no overpaint yet. Paint (T) to start one: it shows only when all ${stagePosePatterns().length} tiles of this pose are on screen. ${poses} pose${poses === 1 ? ' has' : 's have'} one of their own.`;
     const row = document.createElement('div');
     row.className = 'layer-art-actions';
+    // The group's all-poses picture, if any, is listed above with Move and Remove.
     row.append(button('btn-overpaint-create', 'Paint this pose', 'Start this pose’s own picture and switch to Overpaint painting (T)', () => setPaintOn('overpaint')));
-    if (layerArtOf(group)) {
-      const also = document.createElement('p');
-      also.className = 'muted';
-      also.textContent = 'The group also has a picture for all its poses; it shows on this one too.';
-      box.append(also);
-      row.append(button('btn-overpaint-move-pose', 'Move the all-poses overpaint to this pose', 'Make the group’s picture this pose’s own, so it stops showing on the other poses', () => overpaintThisPose(true)));
-    }
     row.append(scopeButton());
     box.append(row);
     const screensNote = groupScreensNote(group);

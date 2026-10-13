@@ -11,6 +11,7 @@ import { freeCrop } from '../shared/stage-view.js';
 import { isObjGroup, patternsInNoPose } from '../../src/obj-sprite-profiles.js';
 import { layerArtOf, layerArtPixels, layerArtStageRect, paintLayerArt } from '../../src/layer-art.js';
 import { isStarterShade } from '../../src/starter-paint.js';
+import { paintOriginal } from '../../src/original-view.js';
 import { getWindowsTableBytesFromState } from '../../src/vip-world-clip.js';
 import { overpaintPanel, selectedArt, showTouchUps } from './overpaint.js';
 import { folderPicker } from './group-list.js';
@@ -32,6 +33,7 @@ let poseLayerKey = '';
 export function invalidateRender() {
   composedKey = '';
   poseLayerKey = '';
+  originalKey = '';
 }
 
 /** Composite a frame into `frameCanvas`, memoized on frame + view settings. */
@@ -247,6 +249,59 @@ function onionAlpha() {
   return Number.isFinite(v) && v > 0 ? Math.min(1, v) : ctx.ONION_ALPHA;
 }
 
+/** True while O is held: the original picture at full strength, whatever Original is set to. */
+let originalPeek = false;
+
+/** Hold O to see the original picture; let go to see the paint again. */
+export function setOriginalPeek(on) {
+  originalPeek = !!on;
+}
+
+/** Original: the pose's monochrome picture, as the game draws it, over the paint. */
+export function originalOn() {
+  return originalPeek || !!ctx.el('toggle-original')?.checked;
+}
+
+function originalAlpha() {
+  if (originalPeek) return 1;
+  const v = Number(ctx.el('original-alpha')?.value);
+  return Number.isFinite(v) && v > 0 ? Math.min(1, v) : 1;
+}
+
+let originalCanvas = null;
+let originalKey = '';
+
+/** The pose's original picture in a frame-sized canvas, transparent elsewhere (memoized). */
+function composeOriginal(view) {
+  const state = view?.origin && view.frameIndex >= 0 ? frameState(ctx.session, view.frameIndex) : null;
+  const bounds = state ? poseBounds(view.pose, view.origin) : null;
+  if (!bounds) return null;
+  if (!originalCanvas) {
+    originalCanvas = document.createElement('canvas');
+    originalCanvas.width = FRAME_W;
+    originalCanvas.height = FRAME_H;
+  }
+  const key = `${view.frameIndex}|${view.pose.poseId}|${view.origin.x},${view.origin.y}|${ctx.eye()}`;
+  if (key === originalKey) return originalCanvas;
+  const octx = /** @type {CanvasRenderingContext2D} */ (originalCanvas.getContext('2d'));
+  const image = octx.createImageData(FRAME_W, FRAME_H);
+  const lookup = poseTileLookup(state, view.pose, view.origin, ctx.eye());
+  paintOriginal({
+    data: image.data,
+    width: FRAME_W,
+    height: FRAME_H,
+    bounds,
+    lookup: (x, y) => {
+      const hit = lookup(x, y);
+      return hit ? { value: shadeAt(hit.tileBytes, hit.lx, hit.ly), draw: hit.draw } : null;
+    },
+    gplt: state.gplt,
+  });
+  octx.putImageData(image, 0, 0);
+  originalKey = key;
+  return originalCanvas;
+}
+
 /** The onion pose menu follows the filmstrip, keeping the chosen pose while it is still there. */
 export function renderOnionOptions() {
   const select = /** @type {HTMLSelectElement|null} */ (ctx.el('onion-pose'));
@@ -357,6 +412,13 @@ export function drawStage() {
       ctx.stageCtx.clip();
     }
     ctx.stageCtx.drawImage(ctx.poseCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, paneW, paneH);
+    // Original: the game's monochrome over the paint, lined up pixel for pixel, so bulk-filled
+    // paint can be checked (and erased) against what the game draws.
+    const original = originalOn() && !selectedArt()?.hideTiles ? composeOriginal(view) : null;
+    if (original) {
+      ctx.stageCtx.globalAlpha = originalAlpha();
+      ctx.stageCtx.drawImage(original, crop.x, crop.y, crop.w, crop.h, 0, 0, paneW, paneH);
+    }
     ctx.stageCtx.restore();
   }
 
@@ -392,7 +454,7 @@ export function drawStage() {
 
   const setNote = setRect ? ` · one set: ${view.set.indices.length} of ${view.pose.tiles.length} tiles` : '';
   const zoomNote = ctx.freeView ? ' · wheel zoom (Fit to reset)' : '';
-  ctx.el('stage-note').textContent = `${frameLabel(ctx.session, view.frameIndex) || '—'} · ${scale}×${zoomNote}${setNote}${ctx.stageMirror ? ' · mirrored' : ''}${ctx.sideBySide() ? ' · painted | reference' : ''}`;
+  ctx.el('stage-note').textContent = `${frameLabel(ctx.session, view.frameIndex) || '—'} · ${scale}×${zoomNote}${setNote}${ctx.stageMirror ? ' · mirrored' : ''}${originalOn() ? ' · original' : ''}${ctx.sideBySide() ? ' · painted | reference' : ''}`;
 }
 
 /** The layer's window on screen, when the selected group's overpaint hides its tiles. */

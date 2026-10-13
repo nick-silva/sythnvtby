@@ -19,7 +19,9 @@ import {
   FRAME_W,
   FRAME_H,
   buildFrameSummaries,
+  frameLabel,
 } from './shared/pack-session.js';
+import { posesNeedingPaint, pickPoseNeedingPaint } from './shared/poses-needing-paint.js';
 
 
 
@@ -68,7 +70,7 @@ import {
 import { getHandoff, putHandoff, deleteHandoff } from '../src/handoff-store.js';
 import { writeJournal, readJournal, clearJournal, bytesToBase64, base64ToBytes } from '../src/work-journal.js';
 import { VBPACK_HANDOFF_STEPS } from '../src/save-progress.js';
-import { HANDOFF_KEY_PROJECT_STATE, HANDOFF_KEY_RETURN_PACK, HANDOFF_KEY_RETURN_STATE } from './shared/project-return.js';
+import { HANDOFF_KEY_PROJECT_STATE, HANDOFF_KEY_RETURN_PACK, HANDOFF_KEY_RETURN_STATE, frameIndexForReturn } from './shared/project-return.js';
 import { downloadBlob } from '../src/art-pack.js';
 
 
@@ -190,8 +192,10 @@ import {
   pixelPaintState,
   renderDetail,
   renderOnionOptions,
+  setOriginalPeek,
   showUnpainted,
 } from './sprite-studio/render.js';
+import { initAutopaint, openAutopaint } from './sprite-studio/autopaint.js';
 import {
   initGhostBox,
   colourForHash,
@@ -687,6 +691,18 @@ initPainting({
   get tool() { return tool; },
   set tool(v) { tool = v; },
 });
+
+initAutopaint({
+  get el() { return el; },
+  eye,
+  markDirty,
+  get poseViews() { return poseViews; },
+  renderPalette,
+  get selectedGroup() { return selectedGroup; },
+  get session() { return session; },
+  setStatus,
+});
+el('btn-autopaint').addEventListener('click', openAutopaint);
 
 initPick({
   brightness,
@@ -1531,13 +1547,69 @@ window.addEventListener('keydown', (e) => {
 // Hold R to see the reference at full strength, like the Project tool.
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'r' && e.key !== 'R') return;
-  if (e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  if (e.repeat || isTextEntry(e.target)) return;
   referencePeek = true;
   drawStage();
 });
 window.addEventListener('keyup', (e) => {
   if (e.key !== 'r' && e.key !== 'R' || !referencePeek) return;
   referencePeek = false;
+  drawStage();
+});
+
+/** Typing into a text box: the only focus that keeps letter keys from the tools. */
+function isTextEntry(t) {
+  return t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && ['text', 'number', 'search', 'email', 'url', 'tel', 'password'].includes(t.type));
+}
+
+// A toolbar control used with the mouse gives focus back, so arrows, Space and the tool keys reach
+// the stage again. Keyboard use (Tab, arrows on a slider) keeps focus where it is.
+let toolbarPointer = false;
+document.addEventListener('pointerdown', (e) => {
+  toolbarPointer = !!(e.target instanceof Element && e.target.closest('.stage-toolbar, .tool-rail'));
+});
+const releaseToolbarFocus = (e) => {
+  const t = e.target;
+  if (!toolbarPointer || !(t instanceof HTMLElement) || isTextEntry(t) || !t.closest('.stage-toolbar, .tool-rail')) return;
+  toolbarPointer = false;
+  (t.closest('button') || t).blur();
+};
+document.addEventListener('change', releaseToolbarFocus);
+document.addEventListener('click', releaseToolbarFocus);
+
+/** Onion's menu and opacity, and Original's opacity, show only while their toggle is on. */
+function syncOverlayControls() {
+  const onion = !!el('toggle-onion').checked;
+  el('onion-pose').hidden = !onion;
+  el('onion-alpha-label').hidden = !onion;
+  el('original-alpha-label').hidden = !el('toggle-original').checked;
+}
+syncOverlayControls();
+el('toggle-onion').addEventListener('change', syncOverlayControls);
+el('toggle-original').addEventListener('change', syncOverlayControls);
+
+// Hold O to see the pose's original picture (the game's monochrome) in place of the paint.
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'o' && e.key !== 'O') return;
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isTextEntry(e.target)) return;
+  e.preventDefault();
+  setOriginalPeek(true);
+  drawStage();
+});
+window.addEventListener('keyup', (e) => {
+  if (e.key !== 'o' && e.key !== 'O') return;
+  setOriginalPeek(false);
+  drawStage();
+});
+// Switching away mid-hold would leave the original stuck on.
+window.addEventListener('blur', () => {
+  setOriginalPeek(false);
+  drawStage();
+});
+el('toggle-original').addEventListener('change', drawStage);
+el('original-alpha').addEventListener('input', () => {
+  // Moving the slider means you want to see it.
+  el('toggle-original').checked = true;
   drawStage();
 });
 
@@ -1550,6 +1622,7 @@ for (const id of ['toggle-onion', 'toggle-pin-background']) {
 // Choosing a pose to ghost turns the onion skin on.
 el('onion-pose').addEventListener('change', () => {
   if (onionPick()) el('toggle-onion').checked = true;
+  syncOverlayControls();
   drawStage();
 });
 try {
@@ -1657,6 +1730,42 @@ window.addEventListener('beforeunload', (e) => {
   e.returnValue = '';
 });
 
+/**
+ * After the Project tool's hand-over: open the saved pose on the frame you were on that still has
+ * pixels nothing colours (the group you had selected first, when it has one there). Otherwise the
+ * group you had selected stays, as before.
+ * @param {unknown} frameVipFile the Project tool's frame @param {string | null} preferGroupId
+ */
+async function goToPoseNeedingPaint(frameVipFile, preferGroupId) {
+  if (!session || typeof frameVipFile !== 'string') return;
+  const frameIndex = frameIndexForReturn(session.frames, frameVipFile);
+  if (frameIndex < 0) return;
+  const where = frameLabel(session, frameIndex) || 'that frame';
+  let needs;
+  try {
+    needs = await posesNeedingPaint(session, frameIndex);
+  } catch (e) {
+    console.warn('[sprite-studio] Could not look for poses needing paint:', e);
+    return;
+  }
+  const pick = pickPoseNeedingPaint(needs, preferGroupId);
+  if (!pick) {
+    setStatus(`Every saved pose on ${where} is coloured. Unpainted art there is in no saved pose yet — capture it as a pose to paint it here.`);
+    return;
+  }
+  const group = session.groups.find((g) => g.id === pick.group.id);
+  if (!group) return;
+  if (selectedGroup?.id !== group.id) selectGroup(group);
+  const id = pick.pose.poseId;
+  const i = poseViews.findIndex((v) => v.pose?.poseId === id || v.pose?.poseId === `__base:${id}`);
+  if (i >= 0) setPoseIndex(i);
+  const rest = needs.length - 1;
+  setStatus(
+    `${group.name || group.id} · ${pick.pose.name || id}: ${pick.unpainted.toLocaleString()} px still uncoloured on ${where}.` +
+      (rest ? ` ${rest} other pose${rest === 1 ? '' : 's'} there need${rest === 1 ? 's' : ''} paint too.` : ''),
+  );
+}
+
 /** Open whatever the Project tool handed over, so the two pages feel like one workflow. */
 // Only when the Project tool just sent you here, and only once: a reload or a visit from the
 // tools page must not reopen an older hand-over (possibly another pack) that Save then writes.
@@ -1678,6 +1787,7 @@ window.addEventListener('beforeunload', (e) => {
     await openPack(buffer, String(name), typeof groupId === 'string' ? groupId : null, state?.fileHandle);
     projectReturn = state;
     syncProjectLink();
+    await goToPoseNeedingPaint(state?.frameVipFile, typeof groupId === 'string' ? groupId : null);
     // Opened: the hand-over has done its job (kept until now so a failed open loses nothing).
     for (const key of [HANDOFF_KEY, `${HANDOFF_KEY}-name`, `${HANDOFF_KEY}-group`, HANDOFF_KEY_PROJECT_STATE]) {
       await deleteHandoff(key).catch(() => {});
@@ -1714,15 +1824,20 @@ el('toggle-touchup').addEventListener('change', () => {
   drawStage();
 });
 
-const TOOL_KEYS = { v: 'btn-tool-none', b: 'btn-tool-brush', e: 'btn-tool-erase', g: 'btn-tool-fill', i: 'btn-tool-pick', c: 'btn-tool-clone', s: 'btn-tool-swap' };
+const TOOL_KEYS = { v: 'btn-tool-none', b: 'btn-tool-brush', e: 'btn-tool-erase', g: 'btn-tool-fill', i: 'btn-tool-pick', c: 'btn-tool-clone', s: 'btn-tool-swap', a: 'btn-autopaint' };
 document.addEventListener('keydown', (e) => {
-  const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+  // Letter keys are the tools unless you are typing: a checkbox, slider, menu or button you just
+  // used in the toolbar keeps focus, and must not swallow B, G or I.
+  const typing = isTextEntry(e.target);
   if (e.key.toLowerCase() === 't' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat && !el('paint-on').hidden) {
+    e.preventDefault();
     setPaintOn(overpaintMode() ? 'tiles' : 'overpaint');
     return;
   }
   const toolButton = TOOL_KEYS[e.key.toLowerCase()];
   if (toolButton && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
+    // A focused menu would also jump to an option starting with that letter.
+    e.preventDefault();
     // Clicking the button keeps the rules in one place (Clone needs a reference).
     el(toolButton).click();
     return;
@@ -1731,9 +1846,7 @@ document.addEventListener('keydown', (e) => {
   // text box, dropdown (fps, hold, the Folder picker…) or slider. A colour well or checkbox
   // keeps focus after you use it, and must not swallow Ctrl+Z or the pose keys.
   const t = e.target;
-  const textEntry =
-    t instanceof HTMLTextAreaElement ||
-    (t instanceof HTMLInputElement && ['text', 'number', 'search', 'email', 'url', 'tel', 'password'].includes(t.type));
+  const textEntry = typing;
   const keysForControl = textEntry || t instanceof HTMLSelectElement || (t instanceof HTMLInputElement && t.type === 'range');
   if ((e.ctrlKey || e.metaKey) && ((e.key.toLowerCase() === 'z' && e.shiftKey) || (e.key.toLowerCase() === 'y' && !e.shiftKey))) {
     if (textEntry) return;

@@ -1,6 +1,6 @@
 ---
 status: current
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: src/overpaint.js, src/picture-store.js, src/overpaint-switch.js, src/pose-overpaint.js, src/screen-gate.js, src/layer-art.js, src/color-layer.js, src/affine-base.js, src/affine-world.js, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, tools/painter.js, tools/painter/, native/core/src/colorizer.cpp, native/core/src/play_pack.cpp
 ---
 
@@ -75,7 +75,12 @@ The picture is drawn on a frame and eye when all of these hold:
   against it (≈1.3 ms a frame with 109 pose pictures on Mario's Tennis, against ≈0.7 ms without).
   **In SpriteStudio**, a *character* (a BG group with 2+ saved poses, not animated, not hiding its
   tiles) paints this pose only by default; *Paint all N poses* switches to the group's picture for
-  the session (`overpaintScope`, `artTarget` in `tools/sprite-studio/overpaint.js`).
+  the session (`overpaintScope`, `artTarget` in `tools/sprite-studio/overpaint.js`). A character's
+  own (group) picture still shows on **every** pose — usually left from before pose pictures, and
+  painting one pose's look over all the others (Toad-PlayingAs's, Oct 12 2026, was moved to its
+  IdleReady pose). The Overpaint panel's *Drawing on this card* (`onThisPosePart`) lists what draws
+  on the card on stage, flags such a picture, and moves it to the pose on stage or removes it
+  (`removePicture`) whichever scope the panel is in.
 - **The layer is one of the group's worlds**, if the group lists worlds.
 - **The layer draws from the same background map** the picture was made on. A game that double
   buffers (two layers taking turns, each with its own part of map memory) only shows the picture on

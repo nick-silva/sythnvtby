@@ -1,6 +1,6 @@
 ---
 status: living
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: package.json, vite.config.js
 ---
 
@@ -123,6 +123,7 @@ under `native/` for the PC player.
 | `touch-up.js`, `painter-v2-vip-overlay.js` | Older paint kinds still read: touch-ups and screen-pinned VIP overlays. |
 | `transparent-paint.js`, `starter-paint.js`, `shade-ramp.js` | Paint on see-through pixels, the starter shades a tile begins with, and colour by shade for tiles the game rewrites. |
 | `uncoloured.js`, `pixel-explain.js` | How much of a frame is uncoloured; "what colours this pixel, or why not" (*This pixel*, Pick). |
+| `pose-autopaint.js`, `original-view.js` | Auto-paint: a group's unpainted poses coloured from its painted ones, pixel by pixel from what surrounds each; a pose's original monochrome picture (SpriteStudio's *Original*). |
 
 ### `src/` — groups, poses and when paint shows
 
@@ -178,12 +179,13 @@ UI-free view of a loaded pack (frames, groups, paint, a frame renderer). Its par
 | `overpaint.js`, `recovery.js` | Overpaint and pose pictures (through `src/picture-store.js`); recovered pictures and the Overpaint panel. |
 | `group-list.js`, `tracks.js` | The group lists, folders and search; animation tracks. |
 | `reference.js`, `ghost-box.js` | Reference images; side by side and the ghost box. |
+| `autopaint.js` | The Auto-paint window: which poses to learn from and which to paint, progress, one undo step (`src/pose-autopaint.js`). |
 
 ### `tools/` — shared and other pages
 
 | Where | What |
 |-------|------|
-| `tools/shared/` | `pack-session.js` (above), `save-progress-ui.js` (the save window), `project-return.js` (the Project tool's view carried through SpriteStudio), `recent-groups.js`, `animated-tiles.js`, `stage-view.js` (SpriteStudio's zoom and pan). |
+| `tools/shared/` | `pack-session.js` (above), `save-progress-ui.js` (the save window), `project-return.js` (the Project tool's view carried through SpriteStudio), `recent-groups.js`, `animated-tiles.js`, `stage-view.js` (SpriteStudio's zoom and pan), `poses-needing-paint.js` (the poses on a frame that still need paint, which SpriteStudio opens on arriving from the Project tool). |
 | `tools/memory-analysis*` | The standalone memory-analysis page and the analyzer it shares with the Project tool. |
 | `tools/index.html`, `editor.*`, `viewer.*`, `extract.js` | The tools hub, tile extractor, pack validator and frame viewer. |
 
@@ -197,7 +199,7 @@ UI-free view of a loaded pack (frames, groups, paint, a frame renderer). Its par
 | `patches/`, `scripts/build-core.sh` | The core's patches and the script that rebuilds it reproducibly ([core-build.md](core/core-build.md)). |
 | `tests/e2e/` | Browser regression suite (`s0` runs on the fixture pack, the rest need local files); `tests/e2e/manual-checks.md` lists what needs a human. |
 | `tests/fixtures/` | The synthetic fixture pack, built in code. |
-| `scripts/` | `check-docs.mjs` (the docs check), `bench/` (colorization benchmarks), `png.mjs` (PNG for Node). |
+| `scripts/` | `check-docs.mjs` (the docs check), `bench/` (colorization benchmarks), `png.mjs` (PNG for Node), `readme-shots.mjs` (the README's before/after images, both halves from one captured frame). |
 | `eslint.config.js` | The linter's rules (`npm run lint`, run by `npm test`). |
 
 ### How the two tools are built

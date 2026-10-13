@@ -15,12 +15,14 @@ no server, no account.
 
 ## Before and after
 
-*Left: the game's own picture, captured in the emulator. Right: the same frame with our Mario's
-Tennis colour project, drawn the way the emulator plays it. (A project in progress.)*
+*Left: the game's own picture. Right: the same captured frame with our Mario's Tennis colour
+project. Both halves are rendered from one capture (`scripts/readme-shots.mjs`). A project in
+progress.*
 
 ![A match: Mario against Donkey Kong Jr., in colour](docs/images/compare-match.png)
 ![The mode menu: the players' portraits in colour](docs/images/compare-menu.png)
 ![Luigi on court: each character keeps his own colours](docs/images/compare-luigi.png)
+![Toad on court against Mario](docs/images/compare-toad.png)
 
 ## What it does
 
@@ -46,7 +48,9 @@ screens and game states, paint, and see *why* any pixel is (or isn't) coloured.
 ![The Project tool on a Mario's Tennis match, Mario's group selected](docs/images/project-tool.webp)
 
 **SpriteStudio** — every pose of a character over the scene it was captured in, named
-animations, painting across all poses at once, and pictures per pose.
+animations, painting across all poses at once, and pictures per pose. Paint a few poses and
+**Auto-paint** colours the rest of the group from them (matching each pixel by what surrounds it,
+not by position); **Original** shows the game's monochrome over your paint to check the result.
 
 ![SpriteStudio with Luigi's 85 poses](docs/images/spritestudio.webp)
 
