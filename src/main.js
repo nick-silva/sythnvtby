@@ -217,6 +217,8 @@ function applyVbpackResult(result, options = {}) {
   if (typeof colorLayer.setPainterV2FromVbpack === 'function') {
     colorLayer.setPainterV2FromVbpack(lastPainterV2Rules, lastPainterV2VipOverlays);
   }
+  // Each summary is checked against its frame when read, so new captures just have none yet.
+  lastFrameSummaries = typeof result.frameSummaries === 'string' && result.frameSummaries.length > 0 ? result.frameSummaries : null;
   if (result.vbcolor || result.overrides != null) {
     window.dispatchEvent(new CustomEvent('vb-color-pack', { detail: { data: colorPackData } }));
   }
@@ -385,6 +387,8 @@ let lastVbpackOverridePresets = [];
 let lastPainterV2Rules = null;
 /** Painter v2 VIP overlays JSON string from last pack (or null). */
 let lastPainterV2VipOverlays = null;
+/** The loaded pack's frame summaries (src/frame-summary.js), carried into packs written here. */
+let lastFrameSummaries = null;
 /** Counter for default "State 001" labels when capture dialog uses auto names. */
 let captureAutoStateCounter = 0;
 /** Short-lived message shown at the start of the status line (e.g. after F8 quick capture). */
@@ -2255,6 +2259,7 @@ document.getElementById('btn-export-pack')?.addEventListener('click', async () =
     saveStatesFolder: merged.saveStatesFolder.length > 0 ? merged.saveStatesFolder : undefined,
     ...(lastPainterV2Rules != null && { painterV2Rules: lastPainterV2Rules }),
     ...(lastPainterV2VipOverlays != null && { painterV2VipOverlays: lastPainterV2VipOverlays }),
+    ...(lastFrameSummaries != null && { frameSummaries: lastFrameSummaries }),
   });
   const defaultBase = suggestExportVbpackBaseName();
   const defaultName = normalizeVbpackFileName(`${defaultBase}.vbpack`);
@@ -2395,6 +2400,7 @@ document.getElementById('btn-colorize')?.addEventListener('click', async () => {
       saveStatesFolder: merged.saveStatesFolder.length > 0 ? merged.saveStatesFolder : undefined,
       ...(lastPainterV2Rules != null && { painterV2Rules: lastPainterV2Rules }),
       ...(lastPainterV2VipOverlays != null && { painterV2VipOverlays: lastPainterV2VipOverlays }),
+      ...(lastFrameSummaries != null && { frameSummaries: lastFrameSummaries }),
     });
     const buffer = await blob.arrayBuffer();
     await putHandoff(HANDOFF_KEY_COLORIZE, buffer);

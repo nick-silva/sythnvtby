@@ -4,7 +4,9 @@
  * and deleting poses. Split out of tools/sprite-studio.js, which passes in the state and functions
  * it shares (initPoses).
  */
-import { frameState, frameIndexForFrameId, posesOf, locatePose, poseBounds, bgGroupViews, affinePoseView, affineBaseView, frameLabel, liveGroupTileColors } from '../shared/pack-session.js';
+import { frameState, frameIndexForFrameId, posesOf, locatePose, poseBounds, bgGroupViews, bgGroupFrameHits, frameWram, affinePoseView, affineBaseView, frameLabel, liveGroupTileColors } from '../shared/pack-session.js';
+import { heldProjectGameStates, projectConditionsAllow } from '../../src/game-states.js';
+import { findNewPoses, findDuplicatePoses, mergeDuplicatePose } from '../../src/pose-suggest.js';
 import { getTileBytes, hashTile } from '../../src/vip-state.js';
 import { findRepeatSet } from '../../src/pattern-set.js';
 import { shadeRampFromPaint } from '../../src/shade-ramp.js';
@@ -226,6 +228,76 @@ export function keepFrameAsPose(view) {
   ctx.renderDetail();
   const note = first ? ' The filmstrip now shows kept poses only — delete them all to see every frame again.' : '';
   ctx.setStatus(`Kept “${pose.name}” as a pose of ${ctx.selectedGroup.name || ctx.selectedGroup.id}.${note} Save to keep it.`);
+}
+
+/**
+ * Find poses for a background character (src/pose-suggest.js): the poses its captured frames show
+ * that are not kept yet, and kept poses that duplicate one another. Only its unscaled layers count —
+ * a scaled layer (an opponent drawn through the court's zoom) mixes stray tiles into the layout —
+ * and only frames where its conditions hold, so another character sharing a few of its tiles does
+ * not suggest fragments.
+ * @returns {{ frames: number, fresh: Array<{ key: string, tiles: number, frames: number[], view: any }>, duplicates: Array<{ keep: string, drop: string[], safe: boolean }> }}
+ */
+export function poseSuggestions(group) {
+  const eye = ctx.eye();
+  // Frames where its conditions hold, checked from memory before any frame is decoded.
+  const playing = (i) => {
+    const held = heldProjectGameStates(frameWram(ctx.session, i));
+    return !held || projectConditionsAllow(group, held);
+  };
+  const all = bgGroupFrameHits(ctx.session, group, eye, { only: playing });
+  // A frame whose view took in a scaled layer is looked at again on its unscaled layers only.
+  const mixed = all.filter((h) => h.view.pose.affineWorlds);
+  const scaled = new Set(mixed.flatMap((h) => h.view.pose.affineWorlds));
+  const worlds = Array.isArray(group.criteria?.windowIds) ? group.criteria.windowIds : [];
+  const plainWorlds = worlds.filter((w) => !scaled.has(w));
+  const again = mixed.length && plainWorlds.length
+    ? bgGroupFrameHits(ctx.session, { ...group, criteria: { ...group.criteria, windowIds: plainWorlds } }, eye, { only: ((set) => (i) => set.has(i))(new Set(mixed.map((h) => h.view.frameIndex))) })
+    : [];
+  const hits = [...all, ...again]
+    .filter((h) => !h.view.pose.affineWorlds)
+    .map((h) => ({ frameIndex: h.view.frameIndex, tiles: h.view.pose.tiles, view: h.view }));
+  return {
+    frames: hits.length,
+    fresh: findNewPoses({ hits, kept: posesOf(group).filter((p) => !p.affine) }),
+    duplicates: findDuplicatePoses(group),
+  };
+}
+
+/**
+ * Keep these frame views as poses and fold these duplicates into their twins, as one change.
+ * @param {any[]} views from poseSuggestions().fresh @param {Array<{ keep: string, drop: string }>} merges
+ * @returns {{ kept: number, removed: number }}
+ */
+export function applyPoseSuggestions(views, merges) {
+  let group = ctx.selectedGroup;
+  if (!group) return { kept: 0, removed: 0 };
+  let kept = 0;
+  for (const view of views) {
+    const sourceFrameId = frameIdForIndex(view.frameIndex);
+    const name = ctx.session.frames[view.frameIndex]?.label || `Frame ${view.frameIndex + 1}`;
+    const pose = buildPoseFromView({ poseId: nextPoseId(group), name, view, ...(sourceFrameId && { sourceFrameId }) });
+    if (!pose) continue;
+    group = addPoseToGroup(group, pose);
+    kept++;
+  }
+  let removed = 0;
+  for (const { keep, drop } of merges) {
+    if (!posesOf(group).some((p) => p.poseId === drop)) continue;
+    group = mergeDuplicatePose(group, drop, keep);
+    removed++;
+  }
+  if (!kept && !removed) return { kept, removed };
+  ctx.stopPlayback();
+  ctx.replaceSelectedGroup(group);
+  ctx.poseViews = buildPoseViews(ctx.selectedGroup);
+  ctx.poseIndex = Math.min(ctx.poseIndex, Math.max(0, ctx.poseViews.length - 1));
+  renderStrip();
+  syncPoseScrub();
+  refreshActiveReference();
+  ctx.drawStage();
+  ctx.renderDetail();
+  return { kept, removed };
 }
 
 export function syncPoseScrub() {
@@ -506,6 +578,7 @@ export function renderStrip() {
       mark.setAttribute('aria-label', mark.title);
       card.append(mark);
     }
+    syncUnpaintedMark(card, view);
     const stored = storedPose(view.pose);
     if (canDelete && isDeletablePose(stored)) {
       const del = document.createElement('button');
@@ -555,14 +628,38 @@ export function refreshPoseThumbs(hashes) {
       staleThumbCards.delete(card);
       const view = card.isConnected ? ctx.poseViews[Number(card.dataset.poseIndex)] : null;
       const thumb = card.querySelector('canvas');
-      if (view && thumb) drawPoseThumb(thumb, view);
+      if (view && thumb) {
+        drawPoseThumb(thumb, view);
+        syncUnpaintedMark(card, view);
+      }
     }
     if (staleThumbCards.size) thumbRefreshTimer = setTimeout(step, 16);
   };
   thumbRefreshTimer = setTimeout(step, 0);
 }
 
-function drawPoseThumb(thumb, view) {
+/**
+ * The card's cyan mark, top right: pixels of this pose nothing has coloured yet (counted when its
+ * thumbnail is composed, src/render.js countUnpainted). Gone once the pose is fully painted.
+ */
+function syncUnpaintedMark(card, view) {
+  const n = view?.unpainted || 0;
+  let mark = card.querySelector('.pose-unpainted-mark');
+  if (!n) {
+    mark?.remove();
+    return;
+  }
+  if (!mark) {
+    mark = document.createElement('span');
+    mark.className = 'pose-unpainted-mark';
+    mark.textContent = '◪';
+    card.append(mark);
+  }
+  mark.title = `${n.toLocaleString()} px of this pose still unpainted — Painting complete keeps them at their grey`;
+  mark.setAttribute('aria-label', mark.title);
+}
+
+export function drawPoseThumb(thumb, view) {
   const bounds = view.origin ? poseBounds(view.pose, view.origin) : null;
   const w = bounds ? bounds.x1 - bounds.x0 : 16;
   const h = bounds ? bounds.y1 - bounds.y0 : 16;

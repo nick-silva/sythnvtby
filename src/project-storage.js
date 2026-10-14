@@ -1,5 +1,5 @@
 /**
- * What a project's space is used for (File ▸ Project storage…; docs/design/memory-states.md §6):
+ * What a project's space is used for (Project ▸ Project storage…; docs/design/memory-states.md §6):
  * each kind of thing the pack holds, how many and how big (before the pack's compression), what it
  * is for and what goes without it; and the memory recordings per question, the kind that piles up
  * fastest while answering one.

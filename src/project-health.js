@@ -15,7 +15,7 @@
  *  - screen: captured frames no screen recognises (a to-do: screen limits treat them as other screens).
  *  - unpainted: tiles in a group that are not painted yet — a to-do rather than a problem.
  *
- * Nothing here changes anything; the Project tool shows the list (File ▸ Check project…).
+ * Nothing here changes anything; the Project tool shows the list (Project ▸ Check project…).
  */
 
 import { buildGroupTileColorIndex, resolveGroupTileMatch } from './color-layer.js';

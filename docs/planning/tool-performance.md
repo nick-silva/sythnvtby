@@ -1,6 +1,6 @@
 ---
 status: partial
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: tools/painter.js, tools/painter/, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/group-screens.js, src/color-layer.js, src/group-tile-colors.js, src/art-pack.js, src/zip-read.js, src/starter-paint.js, src/project-health.js, tests/e2e/s9-performance.mjs, src/lazy-entries.js, src/affine-world.js, src/memory-recorder.js, src/zip-write.js, tools/painter/pose-sources.js, src/pose-source-frames.js
 ---
 
@@ -178,9 +178,29 @@ at 1,000 frames.
 3. Without folder access (non-Chromium), the `.vbpack` path keeps working as today.
    *Expected:* Save from 5–10 s to under 0.5 s; a crash loses at most the journal's few seconds.
 
-### Phase 4 — 1,000+ frames: annotate, then archive harder (M) — backlogged Oct 9
+### Phase 4 — 1,000+ frames: annotate, then archive harder (M) — item 1 built Oct 13
 
-Not needed yet: at 264 frames the tools are fast (Phases 1–3). Start before a project passes
+**Item 1 built Oct 13 2026** (`src/frame-summary.js`, `framesummaries.json`): one summary per frame
+serves SpriteStudio's frame filter and the Project tool's screen index, and carries each frame's
+brightness. Opening reads the saved summaries; only frames without one are decoded, and their
+summaries are saved next time. Measured on Mario's Tennis padded to 1,000 frames (467 frames
+duplicated), before → after:
+
+| | before | after |
+|---|---|---|
+| Project tool open | 3.1 s | 0.77 s |
+| SpriteStudio open | 2.7 s | 0.60 s |
+| first frame shown (brightness reference over every frame) | 1.5 s, blocking | 6 ms |
+| background summaries | 5.3 s | 12 ms |
+| SpriteStudio strokes on Luigi (85 poses) | 380–460 ms | 215–293 ms |
+| heap after open (Node) | 89 MB | 46 MB |
+
+The file is ~4.3 KB a frame (4.4 MB at 1,000, before compression); opening costs ~90 ms more to
+read it. Every summary matched both tools' own index on all 467 Mario's Tennis frames. Still decoding
+every frame after open: the Project tool's background Check project (3.7 s at 1,000 frames, in
+slices) — it needs draw positions, which summaries don't keep. Items 2–4 below are still to do.
+
+At 264 frames the tools were fast (Phases 1–3). Start before a project passes
 ~400–500 frames, when memory (about 1 MB per frame open in SpriteStudio's cache, the 48 MB
 read cache, and the pack's own bytes) and the Save file write (~0.2 MB per frame) start to show.
 Finishing Mario's Tennis is expected to need hundreds more captures.

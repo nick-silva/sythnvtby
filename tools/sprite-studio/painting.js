@@ -4,15 +4,15 @@
  * starter shades for unpainted tiles. Split out of tools/sprite-studio.js, which passes in the state
  * and functions it shares (initPainting).
  */
-import { frameState, poseBounds, poseTileAtVip, poseTileLookup, shadeAt, paintTilePixel, patternShades, paintTargetGroupFor } from '../shared/pack-session.js';
+import { frameState, poseBounds, poseTileAtVip, poseTileLookup, shadeAt, paintTilePixel, patternShades, paintTargetGroupFor, packRgbaForHash } from '../shared/pack-session.js';
 import { referenceColorAt } from '../../src/reference-fill.js';
 import { getTileBytes, hashTile } from '../../src/vip-state.js';
 import { floodFill } from '../../src/flood-fill.js';
 import { isObjGroup } from '../../src/obj-sprite-profiles.js';
 import { copyPixels, pixelAt } from '../../src/layer-art-edit.js';
-import { isStarterShade } from '../../src/starter-paint.js';
+import { isStarterShade, keptStarterColour, STARTER_SHADES } from '../../src/starter-paint.js';
 import { activePicture, artChanged, fillArtAt, materializePosePicture, paintArtAt, pickArtAt, pushArtUndo } from './overpaint.js';
-import { renderStrip } from './poses.js';
+import { refreshPoseThumbs, renderStrip } from './poses.js';
 import { pushUndo, undoStack } from './history.js';
 import { drawStage, invalidateRender } from './render.js';
 import { colourForHash, paintStore, paneAt } from './ghost-box.js';
@@ -143,6 +143,70 @@ export function paintAt(e) {
 }
 
 /**
+ * A lit pose pixel nothing has chosen a colour for: its tile has no paint, the pixel is clear in a
+ * painted tile, or it still holds a starting grey (src/starter-paint.js).
+ */
+export function isUnpaintedPixel(hit) {
+  const value = shadeAt(hit.tileBytes, hit.lx, hit.ly);
+  if (!value) return false;
+  const buf = colourForHash(hit.hash);
+  const o = hit.ly * 8 + hit.lx;
+  return !buf || buf[o * 4 + 3] !== 255 || isStarterShade(buf, o, value);
+}
+
+/**
+ * Painting complete: every unpainted pixel of the card on stage keeps the grey it shows by default,
+ * as a colour of its own ({@link keptStarterColour}), so the pose stops counting as unfinished.
+ * Paint is per tile pattern, so other poses using those tiles keep the same greys too. One undo step.
+ */
+export function completePose() {
+  const view = ctx.poseViews[ctx.poseIndex];
+  const group = ctx.selectedGroup;
+  const state = view?.origin && view.frameIndex >= 0 ? frameState(ctx.session, view.frameIndex) : null;
+  const bounds = state ? poseBounds(view.pose, view.origin) : null;
+  if (!group || !bounds) {
+    ctx.setStatus('Pick a pose card first.');
+    return;
+  }
+  const lookup = poseTileLookup(state, view.pose, view.origin, ctx.eye());
+  const target = paintTargetGroupFor(group);
+  const store = paintStore();
+  const snapshot = new Map();
+  let changed = 0;
+  for (let y = bounds.y0; y < bounds.y1; y++) {
+    for (let x = bounds.x0; x < bounds.x1; x++) {
+      const hit = lookup(x, y);
+      if (!hit || !isUnpaintedPixel(hit)) continue;
+      if (!snapshot.has(hit.hash)) {
+        const existing = store.get(hit.hash);
+        snapshot.set(hit.hash, existing ? Uint8Array.from(existing) : null);
+      }
+      // A tile with no paint starts from the greys it shows (as a first stroke would), then keeps them.
+      const shades = seedShades(hit.hash);
+      const buf = packRgbaForHash(ctx.session, hit.hash, hit.tileBytes, target, shades);
+      const o = (hit.ly * 8 + hit.lx) * 4;
+      const value = shadeAt(hit.tileBytes, hit.lx, hit.ly);
+      const shade = shades ? shades[value] : value;
+      const grey = buf[o + 3] === 255 ? [buf[o], buf[o + 1], buf[o + 2]] : shade === 0 ? [0, 0, 0] : STARTER_SHADES[0][shade];
+      const [r, g, b] = keptStarterColour(grey[0], grey[1], grey[2]);
+      if (paintTilePixel(ctx.session, hit.hash, hit.tileBytes, hit.lx, hit.ly, { r, g, b, a: 255 }, target, shades)) changed++;
+    }
+  }
+  if (!changed) {
+    ctx.setStatus('Nothing left to paint on this pose.');
+    return;
+  }
+  pushUndo({ groupId: target?.id ?? null, map: snapshot });
+  ctx.markDirty();
+  invalidateRender();
+  drawStage();
+  refreshPoseThumbs(new Set(snapshot.keys()));
+  ctx.renderPalette();
+  ctx.renderDetail();
+  ctx.setStatus(`Painting complete: ${changed} px in ${snapshot.size} tile pattern${snapshot.size === 1 ? '' : 's'} keep the grey they showed. Undo takes it back.`);
+}
+
+/**
  * Fill the touching pixels of the clicked colour. It crosses tile edges within what is on
  * stage (this pose, or the BG group's region) unless Across tiles is off, skips pixels the game
  * draws as transparent, and — like every stroke here — paints tile patterns, so each copy of a
@@ -207,6 +271,7 @@ export function floodFillAt(e) {
   drawStage();
   renderStrip();
   ctx.renderPalette();
+  ctx.renderDetail();
   ctx.setStatus(`Filled ${region.length} px across ${snapshot.size} tile pattern(s)${across ? '' : ' (this tile only)'}. Undo puts it back.`);
 }
 
@@ -299,6 +364,7 @@ export function swapColourAt(e) {
   drawStage();
   renderStrip();
   ctx.renderPalette();
+  ctx.renderDetail();
   const what = source === 'shade0' ? 'transparent px (now drawn, covering what is behind)' : 'px';
   ctx.setStatus(`Swapped ${changed} ${what} in ${snapshot.size} of ${patterns.size} tile pattern(s) of “${ctx.selectedGroup.name || ctx.selectedGroup.id}”. Undo puts them back.`);
 }

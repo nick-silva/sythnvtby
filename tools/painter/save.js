@@ -22,6 +22,7 @@ import { updateSelectionUi } from './selection.js';
 import { framePatternsForIndex, rebuildScreenIndex } from './screens-ui.js';
 import { formatByteSize, saveUi } from './paint-inventory-ui.js';
 import { refreshAnimatedShadeRamps, updateGroupDetail } from './group-detail.js';
+import { frameSummariesForSave } from './frame-summaries.js';
 import { getCurrentFrameSelectIndex, getPainterV2LastVipFileForManifest, getRegistryFrameIdForFrameIndex, variantExistsInPools } from './pools.js';
 
 /** The tool's state and functions this part uses (tools/painter.js passes them in). */
@@ -253,6 +254,8 @@ export async function preparePainterVbpackParts(opts = {}) {
     ...(Array.isArray(ctx.gameStatePools) && ctx.gameStatePools.length > 0 && { gameStatePools: ctx.gameStatePools }),
     ...(ctx.gameStates.length > 0 && { gameStates: ctx.gameStates }),
     ...(typeof groupsSchemaVersion === 'number' && { groupsSchemaVersion }),
+    // What each frame shows, so the next open need not decode them (src/frame-summary.js).
+    ...frameSummariesForSave(ctx.loadedPackParts, ctx.availableFrames),
     painterV2Rules: {
       ...defaultPainterV2Rules(),
       ...rules,

@@ -650,12 +650,12 @@ await s.test('This pixel: one sentence on what colours it (or why nothing does),
 
 await s.test('Developer details are off until File ▸ Developer details turns them on (remembered)', async () => {
   const hiddenBefore = !(await page.isVisible('#canvas-hint')) && !(await page.isVisible('#world-filter-debug'));
-  await page.click('#file-menu > summary');
+  await page.click('#project-menu > summary');
   await page.check('#toggle-dev-details');
   await page.click('#file-menu > summary');
   const shown = await page.isVisible('#canvas-hint');
   const stored = await page.evaluate(() => localStorage.getItem('vbc.devDetails'));
-  await page.click('#file-menu > summary');
+  await page.click('#project-menu > summary');
   await page.uncheck('#toggle-dev-details');
   await page.click('#file-menu > summary');
   const hiddenAfter = !(await page.isVisible('#canvas-hint'));
@@ -664,7 +664,7 @@ await s.test('Developer details are off until File ▸ Developer details turns t
 });
 
 await s.test('Export frame PNG downloads an image of the composite', async () => {
-  await page.click('#file-menu > summary');
+  await page.click('#frame-menu > summary');
   const path = `${OUT}/s2-frame-export.png`;
   const name = await captureDownload(page, () => page.click('#file-menu-export-png'), path);
   const bytes = await readFile(path);
@@ -1510,7 +1510,7 @@ await s.test('File ▸ Clean up frames lists frames, keeps pose sources, and Arc
   const pg = await context.newPage();
   const { errors: pgErrors } = instrument(pg);
   await openPainter(pg, PACK_PLAIN);
-  await pg.click('#file-menu > summary');
+  await pg.click('#project-menu > summary');
   expect(!(await pg.isDisabled('#file-menu-cleanup-frames')), 'Clean up frames is disabled with a pack open');
   await pg.click('#file-menu-cleanup-frames');
   await pg.waitForSelector('#frame-cleanup-dialog[open]', { timeout: 60000 });
@@ -1530,7 +1530,7 @@ await s.test('File ▸ Clean up frames lists frames, keeps pose sources, and Arc
   await pg.waitForTimeout(300);
   expect(/no frames were removed/.test((await pg.textContent('#status')) || ''), 'no cancel status');
 
-  await pg.click('#file-menu > summary');
+  await pg.click('#project-menu > summary');
   await pg.click('#file-menu-cleanup-frames');
   await pg.waitForSelector('#frame-cleanup-dialog[open]', { timeout: 60000 });
   await pg.click('#frame-cleanup-none');
@@ -1597,7 +1597,7 @@ await s.test('Frame list Show filter narrows the list to frames with uncoloured 
   const back = await listed();
   expect(back.length === all.length && back.every((r) => !/uncoloured|fully coloured/.test(r.t)), 'All does not show every frame plainly');
   // The Clean up window shows the same counts and its own Show filter.
-  await pg.click('#file-menu > summary');
+  await pg.click('#project-menu > summary');
   await pg.click('#file-menu-cleanup-frames');
   await pg.waitForSelector('#frame-cleanup-dialog[open]', { timeout: 60000 });
   const why = await pg.$$eval('.frame-cleanup-row .why', (ws) => ws.map((w) => w.textContent || ''));
@@ -1706,7 +1706,7 @@ await s.test('Shared tiles: the losing group is marked, Check project finds it, 
   const statusAfter = (await pg.textContent('#status')) || '';
   const answerAfter = ((await pg.textContent('#inspector-answer')) || '').replace(/\s+/g, ' ');
   const pillAfter = await pg.$(`${loserRow} .behind-pill`);
-  await pg.click('#file-menu > summary');
+  await pg.click('#project-menu > summary');
   await pg.click('#file-menu-check-project');
   await pg.waitForFunction(() => /across/.test(document.querySelector('#health-list .health-status')?.textContent || '') && !/again/.test(document.querySelector('#health-list .health-status')?.textContent || ''), null, { timeout: 60000 });
   const stillListed = await pg.locator('.health-issue').filter({ hasText: 'E2E Loser: on' }).count();
@@ -1842,7 +1842,7 @@ await s.test('File ▸ Game states: a question answered from frames added to its
   const { errors: pgErrors, answers: pgAnswers } = instrument(pg);
   await openPainter(pg, PACK_ANNOTATED);
   const openGs = async () => {
-    await pg.click('#file-menu > summary');
+    await pg.click('#project-menu > summary');
     await pg.click('#file-menu-game-states');
     await pg.waitForSelector('#game-states-dialog[open]');
   };
@@ -1904,7 +1904,7 @@ await s.test('File ▸ Project storage lists what the pack holds, with sizes, an
   const pg = await context.newPage();
   const { errors: pgErrors } = instrument(pg);
   await openPainter(pg, PACK_ANNOTATED);
-  await pg.click('#file-menu > summary');
+  await pg.click('#project-menu > summary');
   await pg.click('#file-menu-storage');
   await pg.waitForSelector('#storage-dialog[open]');
   const total = ((await pg.textContent('#storage-body .storage-total')) || '').trim();

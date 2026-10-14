@@ -1,5 +1,5 @@
 /**
- * The Project tool's "Project storage" window (File ▸ Project storage…; src/project-storage.js):
+ * The Project tool's "Project storage" window (Project ▸ Project storage…; src/project-storage.js):
  * what the project's space is used for, kind by kind, and the memory recordings per question,
  * with the ways to make it smaller. Built from DOM nodes; the Project tool does the actions.
  */

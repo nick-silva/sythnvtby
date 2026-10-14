@@ -4,6 +4,8 @@
  */
 import { buildPlayPack, PLAY_PACK_EXTENSION } from '../../src/play-pack.js';
 import { comparePacks, mergePacks } from '../../src/pack-merge.js';
+import { parseVbcp } from '../../src/vbcp.js';
+import { importVbcp, summarizeVbcp, describeLeftOut } from '../../src/vbcp-import.js';
 import { splitFrames, archivePackParts, coverageOfStates, withArchivedCoverage, frameBytes } from '../../src/frame-cleanup.js';
 import { analyzeFrames, chooseFramesToRemove } from './frame-cleanup-ui.js';
 import { measureUncoloured } from '../../src/uncoloured.js';
@@ -27,18 +29,21 @@ export function initFileMenu(context) {
   wireFrameMenu();
 }
 
+/** The menu row's menus: File, Project, Frame. */
+const menuRow = () => /** @type {HTMLDetailsElement[]} */ ([...document.querySelectorAll('.menu-row details.file-menu')]);
+
 export function closePainterFileMenu() {
-  if (ctx.fileMenu) ctx.fileMenu.open = false;
-  if (ctx.frameMenu) ctx.frameMenu.open = false;
+  for (const menu of menuRow()) menu.open = false;
 }
 
 /** Frame menu: per-frame utilities (export the capture, bring a colorized one back, name it). */
 function wireFrameMenu() {
-  if (ctx.frameMenu) {
-    ctx.frameMenu.addEventListener('toggle', () => {
-      if (!ctx.frameMenu.open) return;
-      if (ctx.fileMenu) ctx.fileMenu.open = false;
-      updateFrameMenuState();
+  // One menu open at a time: opening one closes the others.
+  for (const menu of menuRow()) {
+    menu.addEventListener('toggle', () => {
+      if (!menu.open) return;
+      for (const other of menuRow()) if (other !== menu) other.open = false;
+      if (menu === ctx.frameMenu) updateFrameMenuState();
     });
   }
   ctx.frameMenuExportShot?.addEventListener('click', () => {
@@ -123,16 +128,18 @@ function wireFrameMenu() {
   canvasForReference?.addEventListener('pointerup', endReferenceDrag);
   canvasForReference?.addEventListener('pointercancel', endReferenceDrag);
 
-  // Leaving for the emulator throws away everything unsaved, so it asks first.
-  document.getElementById('btn-goto-emulator')?.addEventListener('click', () => {
+  // Leaving for the emulator or the tools list throws away everything unsaved, so both ask first.
+  const leaveTo = (url, where) => {
     if (ctx.hasUnsavedPainterEdits()) {
-      const ok = window.confirm('Leave for the emulator?\n\nUnsaved changes in this pack (paint, groups, references, frame details) will be lost. Save or Save and Play first to keep them.');
+      const ok = window.confirm(`Leave for ${where}?\n\nUnsaved changes in this pack (paint, groups, references, frame details) will be lost. Save or Save and Play first to keep them.`);
       if (!ok) return;
-      void ctx.clearProjectJournal().finally(() => ctx.leavePainterTo('/'));
+      void ctx.clearProjectJournal().finally(() => ctx.leavePainterTo(url));
       return;
     }
-    ctx.leavePainterTo('/');
-  });
+    ctx.leavePainterTo(url);
+  };
+  document.getElementById('btn-goto-emulator')?.addEventListener('click', () => leaveTo('/', 'the emulator'));
+  document.getElementById('btn-goto-tools')?.addEventListener('click', () => leaveTo('/tools/', 'the tools list'));
 }
 
 
@@ -305,6 +312,70 @@ export async function importFromAnotherPack(buffer, otherName) {
   ctx.setStatus(`Imported from “${otherName}”: ${log.slice(0, 3).join(' ')}${more} Not saved yet — Save to keep it.`);
 }
 
+/**
+ * File ▸ Import VBoy Color pack…: a `.vbcp` colour pack as a head start (src/vbcp-import.js) —
+ * shared colours for tiles with none yet, a group per layer it colours its own way. Nothing already
+ * painted changes; the project reloads unsaved, on the same frame and group.
+ */
+export async function importVbcpPack(buffer, fileName) {
+  if (!ctx.loadedPackParts) {
+    ctx.setStatus('Open a .vbpack first.');
+    return;
+  }
+  let vbcp;
+  try {
+    vbcp = parseVbcp(buffer);
+  } catch (err) {
+    ctx.setStatus(`Could not read “${fileName}”: ${err?.message || err}`);
+    return;
+  }
+  const prepared = await preparePainterVbpackParts({ updateCurrentVip: false });
+  if (!prepared.ok) {
+    ctx.setStatus(prepared.cancelled ? 'Import cancelled.' : 'Import stopped: this project did not pass its checks.');
+    return;
+  }
+  const s = summarizeVbcp(prepared.merged, vbcp);
+  const rom =
+    s.romMatches === false
+      ? '\n\n⚠ This pack was made for a different ROM than this project’s. Its colours may land on the wrong tiles.'
+      : s.romMatches === null
+        ? ''
+        : '\n\nMade for this project’s ROM.';
+  const skipped = describeLeftOut(s.skipped);
+  const message =
+    `Import “${fileName}” (VBoy Color)?\n\n` +
+    `• ${s.newTiles.toLocaleString()} tile colour(s) as shared colours (${s.pixels.toLocaleString()} px)` +
+    (s.alreadyColoured ? `; ${s.alreadyColoured.toLocaleString()} tile(s) this project already colours stay as they are` : '') +
+    (skipped ? `\n• Not brought in: ${skipped}` : '') +
+    '\n• No groups are made: grouping stays yours' +
+    rom +
+    '\n\nNothing you painted changes. Not saved until you Save.';
+  if (!window.confirm(message)) {
+    ctx.setStatus('Import cancelled.');
+    return;
+  }
+  ctx.setStatus(`Importing “${fileName}”…`);
+  let result;
+  try {
+    result = importVbcp(prepared.merged, vbcp, { fileName });
+    result.blob = await buildArtPack(result.parts);
+  } catch (err) {
+    ctx.setStatus(`Import failed: ${err?.message || err}. This project is unchanged.`);
+    return;
+  }
+  const view = readReturnState(captureProjectReturnState());
+  await ctx.loadVbpackBuffer(await result.blob.arrayBuffer(), ctx.loadedPackName);
+  if (view) restoreProjectView(view);
+  ctx.groupsDirty = true;
+  updateSelectionUi();
+  console.info(`[painter] imported ${fileName}:\n${result.log.join('\n')}`);
+  ctx.setStatus(`Imported “${fileName}”: ${result.log.slice(0, 2).join(' ')} Not saved yet — Save to keep it.`);
+}
+
+export function importVbcpPackFromMenu() {
+  document.getElementById('file-import-vbcp')?.click();
+}
+
 export async function importFromAnotherPackFromMenu() {
   const picked = await pickOpenVbpackFile();
   if (picked.status === 'ok') {
@@ -334,7 +405,7 @@ async function writeFrameArchive(parts) {
 }
 
 /**
- * File ▸ Clean up frames…: take captured frames out of the project (src/frame-cleanup.js),
+ * Project ▸ Clean up frames…: take captured frames out of the project (src/frame-cleanup.js),
  * archived into a separate .vbpack first or deleted. The project reloads, unsaved, on the same
  * frame (if it stayed) and group; Save writes the file it was opened from.
  */

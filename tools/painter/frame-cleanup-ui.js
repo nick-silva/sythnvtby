@@ -1,5 +1,5 @@
 /**
- * The Project tool's File ▸ Clean up frames… window: every captured frame with a thumbnail, its
+ * The Project tool's Project ▸ Clean up frames… window: every captured frame with a thumbnail, its
  * size and why it stays or can go (src/frame-cleanup.js). It only picks frames; the Project tool
  * takes them out and reloads.
  */

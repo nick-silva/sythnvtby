@@ -3,8 +3,9 @@
  * frame is, Paint shows on / Paint shows when, learning a game state, and the row pills. Split out of tools/painter.js, which passes in the state and functions it shares
  * (initScreensUi).
  */
-import { deserializeVIPState } from '../../src/vip-dump.js';
-import { frameGroupIndex, screensForGroup, framesShowingGroup } from '../../src/group-screens.js';
+import { screensForGroup, framesShowingGroup } from '../../src/group-screens.js';
+import { toGroupIndex } from '../../src/frame-summary.js';
+import { frameSummary } from './frame-summaries.js';
 import { groupsForScreen, groupScreensOf, withGroupScreens, matchedScreens, groupShownOnScreens, describeGroupScreens, screenLabel } from '../../src/screen-gate.js';
 import { setProjectGameStates, projectGameStates, heldProjectGameStates, projectConditionsAllow, groupConditionsOf, withGroupConditions, withGameState, newGameStateId, failingCondition, describeGroupConditions } from '../../src/game-states.js';
 import { planSubState, groupOnScreen } from '../../src/sub-state-learn.js';
@@ -49,7 +50,8 @@ export function rebuildScreenIndex() {
       // Frames that are not a screen (Current, pose-only) still count for the screens setting.
       const screen = screenNameForFrame(row);
       try {
-        out.push({ screen, frameIndex, index: frameGroupIndex(deserializeVIPState(JSON.parse(row.json)), 0) });
+        // From the frame's saved summary when it has one: no need to decode it (src/frame-summary.js).
+        out.push({ screen, frameIndex, index: toGroupIndex(frameSummary(ctx.loadedPackParts, row)) });
       } catch (err) {
         console.warn('[Groups] Could not index frame for screen usage:', row?.vipFile, err);
       }

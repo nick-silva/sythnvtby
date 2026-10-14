@@ -1,6 +1,6 @@
 ---
 status: living
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: index.html, src/main.js, src/app.css, src/art-pack.js, tools/project.html, tools/painter.js, tools/painter/, tools/sprite-studio.html, tools/sprite-studio.js, tools/sprite-studio/, tools/index.html, tools/viewer.js, tools/extract.js
 ---
 
@@ -155,7 +155,7 @@ debug surface is raw hashes and jargon in the right-hand panel and the status te
 | # | Item | Where | Action | Effort |
 |---|------|-------|--------|--------|
 | D3.11 | The hub gives **Memory analysis**, **Frame viewer**, **Tile extractor**, **Pack validator** and the **Download Python WRAM analyzer** link equal billing with the main tools | `tools/index.html` | Keep Emulator, Project tool and SpriteStudio up top. Put everything else in a collapsed **Developer tools** section (dev-mode only). | S |
-| D3.12 | The **Memory analysis** page duplicates *File ▸ Analyze memory* in the Project tool, and its copy still says "paint tool" | `tools/memory-analysis.html:54, 58`; `tools/memory-analysis.js:346` | Developer tools only. Fix the copy. | XS |
+| D3.12 | The **Memory analysis** page duplicates *Project ▸ Analyze memory* in the Project tool, and its copy still says "paint tool" | `tools/memory-analysis.html:54, 58`; `tools/memory-analysis.js:346` | Developer tools only. Fix the copy. | XS |
 | D3.13 | The Python analyzer (`tools/memory-analysis/analyze_vbpack_ram.py`, version "2.1") has drifted from the in-browser one ("2.2-js") | `tools/memory-analysis-inbrowser.js:4` | Remove the hub download link. Keep the script as legacy or delete it. | XS |
 | D3.14 | The **Frame viewer** has about 20 alignment controls ("Palette 2 = black (debug)", Offset/Scale/Origin, Crop top, Clear top/left/right) and 10 console calls. It also needs a standalone `vbstate.json`, which nothing in the app exports any more. | `tools/viewer.html`; `tools/viewer.js:357, 504, 555-660` | Developer tools only. See [ship-readiness-cleanup.md](ship-readiness-cleanup.md) for the per-control plan. | S |
 | D3.15 | `tools/editor.html` (the pack editor) is not linked from the hub but is still built (`vite.config.js`). It decodes tiles in the wrong bit layout (`tools/editor.js:26-37` versus the shared decoder in `src/vb-2bpp.js`), so its previews and exports are scrambled. | `tools/editor.html`, `tools/editor.js` | **Remove**, or switch it to `src/vb-2bpp.js`. The Project tool and SpriteStudio replace it. | XS |

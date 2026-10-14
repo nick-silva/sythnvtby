@@ -87,3 +87,15 @@ export function isStarterShade(rgba, i, value) {
   const b = rgba[i * 4 + 2];
   return isStarterColour(r, g, b);
 }
+
+/**
+ * A starter shade kept on purpose (SpriteStudio's Painting complete): one more step of blue — the
+ * same grey to the eye, but a colour someone chose, so nothing counts it as unpainted any more. It is
+ * neither a starter shade nor an old one ({@link convertOldStarterShades} moves those), so it stays
+ * as it is. Any other colour comes back unchanged.
+ * @param {number} r @param {number} g @param {number} b
+ * @returns {[number, number, number]}
+ */
+export function keptStarterColour(r, g, b) {
+  return isStarterColour(r, g, b) ? [r, g, b + 1] : [r, g, b];
+}

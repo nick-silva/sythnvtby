@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isStarterShade, isStarterColour, convertOldStarterShades, STARTER_SHADES } from './starter-paint.js';
+import { isStarterShade, isStarterColour, convertOldStarterShades, keptStarterColour, STARTER_SHADES } from './starter-paint.js';
 import { decodeGroupTileColors, encodeGroupTileColors } from './group-tile-colors.js';
 
 const px = (r, g, b, a = 255) => new Uint8Array([r, g, b, a]);
@@ -73,5 +73,26 @@ describe('convertOldStarterShades', () => {
     expect(out.pixels).toBe(0);
     expect(out.pack).toBe(pack);
     expect(out.groups).toBe(groups);
+  });
+});
+
+describe('keptStarterColour', () => {
+  it('turns every starter shade into a look-alike that is neither a starter nor an old starter', () => {
+    for (const ramp of STARTER_SHADES) {
+      for (const shade of ramp.filter(Boolean)) {
+        const kept = keptStarterColour(...shade);
+        expect(isStarterColour(...kept)).toBe(false);
+        expect(kept.slice(0, 2)).toEqual(shade.slice(0, 2));
+        expect(Math.abs(kept[2] - shade[2])).toBe(1);
+        // Not an old (pre-Oct 9) starter either, which opening a pack would convert back.
+        const t = new Uint8Array(256);
+        t.set([...kept, 255], 0);
+        expect(convertOldStarterShades(new Map([[1, t]]), [], decodeGroupTileColors).pixels).toBe(0);
+      }
+    }
+  });
+
+  it('leaves a chosen colour alone', () => {
+    expect(keptStarterColour(0, 255, 4)).toEqual([0, 255, 4]);
   });
 });

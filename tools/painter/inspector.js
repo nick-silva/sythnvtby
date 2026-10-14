@@ -96,7 +96,7 @@ export function syncOverlayAlphaUi(hasReference = !!ctx.activeReferenceMeta && c
   if (wrap) wrap.hidden = !(ctx.screenshotOverlayEnabled || hasReference);
 }
 
-/** File ▸ Developer details: debugging numbers and notes (`.dev-only`), off until asked for. */
+/** Project ▸ Developer details: debugging numbers and notes (`.dev-only`), off until asked for. */
 const DEV_DETAILS_KEY = 'vbc.devDetails';
 function initDevDetails() {
   const box = /** @type {HTMLInputElement|null} */ (document.getElementById('toggle-dev-details'));

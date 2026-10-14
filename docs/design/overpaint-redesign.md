@@ -1,6 +1,6 @@
 ---
 status: partial
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: src/overpaint.js, src/touch-up.js, src/layer-art.js, src/affine-base.js, src/affine-world.js, src/color-layer.js, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, tools/painter.js, tools/painter/, native/core/src/colorizer.cpp, native/core/src/play_pack.cpp
 ---
 

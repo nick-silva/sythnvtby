@@ -549,7 +549,7 @@ export function reorderGroup(id, beforeId) {
 /**
  * Check project (src/project-health.js): every captured frame, a few at a time so the page stays
  * responsive, again a moment after groups or paint change. The count of problems shows next to
- * File only when there are some; the list opens from File ▸ Check project….
+ * File only when there are some; the list opens from Project ▸ Check project….
  */
 export const HEALTH_DELAY_MS = 1500;
 export const HEALTH_PAINT_DELAY_MS = 3000;

@@ -350,6 +350,8 @@ import {
   getVbpackSaveSuggestedFileName,
   importFromAnotherPack,
   importFromAnotherPackFromMenu,
+  importVbcpPack,
+  importVbcpPackFromMenu,
   savePainterVbpackBlob,
 } from './painter/file-menu.js';
 import {
@@ -1127,6 +1129,8 @@ initSelection({
 });
 
 initViewFilters({
+  // Saved frame summaries (tools/painter/frame-summaries.js).
+  get loadedPackParts() { return loadedPackParts; },
   get availableFrames() { return availableFrames; },
   get currentState() { return currentState; },
   drawMatchesGroup,
@@ -1290,6 +1294,8 @@ function selectGroupFromTree(g) {
 }
 
 initScreensUi({
+  // Saved frame summaries (tools/painter/frame-summaries.js).
+  get loadedPackParts() { return loadedPackParts; },
   get availableFrames() { return availableFrames; },
   createGroupRow,
   escapeHtml,
@@ -2277,6 +2283,16 @@ function wireMenus() {
   document.getElementById('file-menu-import-pack')?.addEventListener('click', () => {
     closePainterFileMenu();
     void importFromAnotherPackFromMenu();
+  });
+  document.getElementById('file-menu-import-vbcp')?.addEventListener('click', () => {
+    closePainterFileMenu();
+    importVbcpPackFromMenu();
+  });
+  document.getElementById('file-import-vbcp')?.addEventListener('change', async (e) => {
+    const input = /** @type {HTMLInputElement} */ (e.target);
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) await importVbcpPack(await file.arrayBuffer(), file.name);
   });
   bindGroupSearch();
   document.getElementById('file-menu-check-project')?.addEventListener('click', () => {

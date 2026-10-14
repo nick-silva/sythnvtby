@@ -225,6 +225,8 @@ export function updateSelectionUi() {
   if (exportPlayerItem) exportPlayerItem.disabled = !ctx.loadedPackParts;
   const importPackItem = /** @type {HTMLButtonElement|null} */ (document.getElementById('file-menu-import-pack'));
   if (importPackItem) importPackItem.disabled = !ctx.loadedPackParts;
+  const importVbcpItem = /** @type {HTMLButtonElement|null} */ (document.getElementById('file-menu-import-vbcp'));
+  if (importVbcpItem) importVbcpItem.disabled = !ctx.loadedPackParts;
   const cleanupFramesItem = /** @type {HTMLButtonElement|null} */ (document.getElementById('file-menu-cleanup-frames'));
   if (cleanupFramesItem) cleanupFramesItem.disabled = !ctx.loadedPackParts;
   const gameStatesItem = /** @type {HTMLButtonElement|null} */ (document.getElementById('file-menu-game-states'));

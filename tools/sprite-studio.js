@@ -196,6 +196,7 @@ import {
   showUnpainted,
 } from './sprite-studio/render.js';
 import { initAutopaint, openAutopaint } from './sprite-studio/autopaint.js';
+import { initFindPoses } from './sprite-studio/find-poses.js';
 import {
   initGhostBox,
   colourForHash,
@@ -678,6 +679,7 @@ initPainting({
   get poseIndex() { return poseIndex; },
   get poseViews() { return poseViews; },
   referenceImageData,
+  renderDetail,
   renderPalette,
   get selectedGroup() { return selectedGroup; },
   get session() { return session; },
@@ -703,6 +705,13 @@ initAutopaint({
   setStatus,
 });
 el('btn-autopaint').addEventListener('click', openAutopaint);
+
+initFindPoses({
+  get el() { return el; },
+  get selectedGroup() { return selectedGroup; },
+  get session() { return session; },
+  setStatus,
+});
 
 initPick({
   brightness,
@@ -899,6 +908,7 @@ function endStroke() {
     // Only the poses showing a painted pattern look different; the rest of the strip stays.
     refreshPoseThumbs(new Set(strokeSnapshot.keys()));
     renderPalette();
+    renderDetail();
     const tiles = strokeSnapshot.size;
     if (selectedGroup && !isObjGroup(selectedGroup)) {
       const copies = (poseViews[poseIndex]?.pose.tiles || []).filter((t) => strokeSnapshot.has(t.hash >>> 0)).length;

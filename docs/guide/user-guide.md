@@ -1,6 +1,6 @@
 ---
 status: current
-last-reviewed: 2026-10-11
+last-reviewed: 2026-10-13
 covers: src/pixel-explain.js, src/project-health.js, src/sub-state-learn.js, src/game-states.js, src/memory-questions.js, src/memory-recorder.js, src/memory-panel.js, src/project-storage.js, tools/painter/game-states-panel.js, tools/painter/storage-panel.js, src/screen-gate.js, src/group-order.js, tools/painter/health-panel.js, src/recovery.js, src/work-journal.js, index.html, src/main.js, src/frame-capture.js, src/auto-capture.js, src/frame-step.js, tools/index.html, tools/project.html, tools/painter.js, tools/painter/, tools/painter/sprite-profiles-ui.js, tools/sprite-studio.html, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/art-pack.js, src/group-folders.js, src/group-screens.js, src/layer-art.js, src/paint-gaps.js, src/project-journal.js, src/frame-numbers.js, src/starter-paint.js
 ---
 
@@ -248,18 +248,22 @@ it shows a lot of internals. Here is what matters.
 ### Layout
 
 - **Top bar**:
-  - **File** menu: Open pack…, Save, Save as…, **Check project…** (below), Export frame PNG…,
-    Analyze memory…, the project home settings, and **Developer details** (off by default): the numbers and notes
+  - **File** menu: Open pack…, Save, Save as…, Import from another pack…, Import VBoy Color
+    pack (.vbcp)…, Export for player…, and the project home settings.
+  - **Project** menu: **Check project…** (below), Clean up frames…, Project storage…, Game
+    states…, Analyze memory…, and **Developer details** (off by default): the numbers and notes
     meant for debugging the tools — draws per world under the world grid, pool context over the
     groups tree, the preview note under the canvas. Remembered in this browser.
-  - **Frame** menu: Export screenshot, Add colorized reference…, **Copy reference** (the frame's
+  - **Frame** menu: Export screenshot, Export frame PNG… (the frame as it looks now, coloured), Add colorized reference…, **Copy reference** (the frame's
     number, name and id, e.g. *#57 · InGame · f-muytuaaa-eimjli*, to paste in a note or a message),
     **Go to frame…** (type its number, name or id — an id with a typo or two still finds it),
     Rename frame…. Every frame has a short number (**#57**) at the front of its name in the Frame
     list; it never changes, so *#57* keeps meaning the same frame.
-  - **N to check**, next to File, only when Check project has found something: click it for the
+  - **N to check**, next to Project, only when Check project has found something: click it for the
     list.
-  - Buttons: **Save and Play**, **SpriteStudio →**, Reload frame, Emulator.
+  - Buttons: **Save and Play**, **SpriteStudio →**, Reload frame, then — past the divider — the two
+    that leave the Project tool: **All tools** (the tools list) and **Emulator**. Both ask first
+    when there is unsaved work, which leaving would lose.
 - **Left rail**:
   - **Frame** list, with `<` `>` to step through captures. **Show** under it narrows the list
     (and `<` `>`) to frames still needing colour: **With uncoloured tiles** (tiles with no paint
@@ -545,7 +549,7 @@ The idea: a byte of memory that holds one value whenever *Luigi is the player* a
 *Mario is*, however the match goes. Over many moments of play, every position, score and animation
 byte changes and drops out; the bytes that follow the state stay.
 
-1. **Ask.** **File ▸ Game states… ▸ New question…** in the Project tool (or **New question…** in the
+1. **Ask.** **Project ▸ Game states… ▸ New question…** in the Project tool (or **New question…** in the
    emulator's Memory panel): the question (*Who is the player?*) and its sides (*Luigi is the
    player, Mario is the player*). **Check project** offers **Tell them apart…** for two groups that
    each turn up alone on some frames.
@@ -590,6 +594,18 @@ open project — for example when you painted in two copies of a pack by mistake
 - Nothing is removed from the project and the other pack is only read. The project reloads on the
   same frame and group, **unsaved**: look it over, then **Save** writes to the file you opened.
 
+**File ▸ Import VBoy Color pack (.vbcp)…** brings in a colour pack made for
+[VBoy Color](https://github.com/yuk27/VBoyColor), another Virtual Boy colouring emulator (GPL-3.0),
+as a head start: their packs key colours by the same tile hash ours do, so they land on the same
+tiles. It shows what it would bring and whether the pack was made for this project's ROM, then:
+- **Tile colours** become shared colours (they apply wherever the game draws the tile), only for
+  tiles this project has no shared colours for yet.
+- **No groups are made.** Per-layer, per-palette, map-cell and per-character colours are counted
+  and left out: where one of those spots looks wrong, make a group of your own for it.
+- Nothing you painted changes; the project reloads **unsaved**. The import is noted in the pack
+  (`vbcpImports` in its manifest) so the colours stay credited to VBoy Color. It brings colours,
+  not your groups: tiles still sit in the shared colours until you put them in groups.
+
 ### Which group wins a shared tile
 
 Two groups can include the same tile pattern on the same layer — a letter both *NORMAL* and
@@ -612,7 +628,7 @@ order of the groups in the project (`groups.json`); nothing else decides it.
 - Tiles a pose picture or overpaint covers don't count: the picture shows there, whichever group
   wins.
 
-### File ▸ Check project…
+### Project ▸ Check project…
 
 The same questions as **This pixel**, asked of every captured frame. It runs by itself a moment
 after a project opens and after you change groups or paint, a few frames at a time so the page
@@ -644,7 +660,7 @@ worth knowing, nothing to fix by order), and **Frames no screen recognises** (sc
 them as some other screen; **Analyze memory…** again with more frames of each screen). It looks at the left eye only; the right eye nearly
 always repeats it.
 
-**File ▸ Project storage…** shows what the project's space is used for: frames (picture data,
+**Project ▸ Project storage…** shows what the project's space is used for: frames (picture data,
 screenshots, save states, memory dumps), memory recordings, reference and recovered pictures,
 groups and paint — how many, how big before compression, what each is for and what goes without
 it — and the `.vbpack`'s size on disk (the status line after **Save** says it too). **Clean up
@@ -652,7 +668,7 @@ frames…** is there for frames; **Delete recordings** takes a question's record
 and its game states stay). Memory recordings are small; screenshots, frames and save states are
 most of a big project.
 
-**File ▸ Clean up frames…** takes captured frames you no longer need out of the project, which
+**Project ▸ Clean up frames…** takes captured frames you no longer need out of the project, which
 keeps the `.vbpack` smaller and the Frame list shorter.
 - It lists every frame by screen (state name), with its screenshot, size and why it stays or can
   go. **Frames a pose was captured from, or with a reference picture, always stay** (SpriteStudio
@@ -777,6 +793,20 @@ its edges. It's the nicest place to paint characters.
     it asks: **Clear this pose only** (the tiles no other pose or card of the group uses; shared
     tiles keep their colour everywhere) or **Clear all, shared tiles too** (the other poses lose
     that paint). It lists which poses share tiles, and Undo brings it all back.
+- **Find poses…** (Pose details, for a background character) looks through the captured frames for
+  the character's poses you have not kept and for poses kept twice. It looks only where the
+  character really is (its layers that are not scaled, on frames where its game-state conditions
+  hold) and leaves out fragments much smaller than its usual pose. New poses come ticked to keep,
+  each from the first frame showing it; duplicates come ticked to remove, keeping the one with a
+  picture or a name you chose — removing one moves its animation steps, and its picture if the
+  other has none, to the one kept. A duplicate you named starts unticked, and one where both have a
+  picture is only listed. Nothing is written until you Save.
+- **Painting complete** (Pose details, right rail) finishes the card on stage: every pixel still
+  unpainted — a tile with no paint, a clear pixel, or a starting grey — keeps the grey it shows as
+  paint of its own (the same grey to the eye), so the pose stops counting as unpainted and you don't
+  have to hunt single pixels. The button says how many pixels are left; tiles other poses share keep
+  that grey too, and Undo takes it back. A cyan **◪** at a card's top right means that pose still
+  has unpainted pixels (the amber ◩ top left is its own overpaint picture).
 - **Right rail:** **Reference** (show, opacity, side by side, fill from reference) and
   **Pose** details.
 
@@ -1124,11 +1154,11 @@ Checked against the code on 2026-10-09. Most of these are tracked in the
 |---------|------------|
 | **Overpaint doesn't show on some screen** where the group's tiles are. | It shows where the group has a tile on screen in a layer drawing the same background map. If the game draws the object at another place in its map there, the picture isn't under it; tile paint still is. An old touch-up no captured frame shows stays a touch-up (see [Overpaint](#overpaint-paint-over-a-background-layer), *Older packs*). |
 | **Captures live only in the emulator's memory** until Colorize! or Export .vbpack. The status line says "N captures not saved", and Load ROM, Load pack, Last pack, closing the tab and refreshing all ask first. | Press Export .vbpack or Colorize! after each capture session. |
-| **Sprite paint shows up on unrelated things** that reuse the same tile. | Per-tile paint goes wherever the tile is drawn. Limit the group to its own screens or game states (**Paint shows on** / **Paint shows when…**), move background spots into a BG group (Painted tiles… → group), or give a pose its own picture (Overpaint just this pose). **File ▸ Check project…** lists groups taking another group's colours. |
+| **Sprite paint shows up on unrelated things** that reuse the same tile. | Per-tile paint goes wherever the tile is drawn. Limit the group to its own screens or game states (**Paint shows on** / **Paint shows when…**), move background spots into a BG group (Painted tiles… → group), or give a pose its own picture (Overpaint just this pose). **Project ▸ Check project…** lists groups taking another group's colours. |
 | **Colors stay bright or go dark at the wrong time during fades and flashes.** | Fades follow the game's brightness; adjust **Fade response** if a fade looks off. For menus and flashes done with palettes, tick **Follow the game's palette** on the group. |
 | **A mirrored pose isn't recognized as the same pose.** | Paint still works in both directions. If you need the mirrored version in SpriteStudio, add that capture as its own pose. |
 | **Clicking a sprite in SpriteStudio sometimes paints nothing.** This happens where a transparent tile sits in front. | Try a neighbouring pixel, or zoom in and paint in the Project tool instead. |
-| **Pack files are large**, tens of MB, because every capture keeps the full VIP state (compressed in the pack). | Delete frames you don't need with **File ▸ Clean up frames…** (it can archive them), and keep packs on a drive with space. |
+| **Pack files are large**, tens of MB, because every capture keeps the full VIP state (compressed in the pack). | Delete frames you don't need with **Project ▸ Clean up frames…** (it can archive them), and keep packs on a drive with space. |
 | **After opening a pack with Load pack, Colorize! → Save and Play** may save a copy to your project home or Downloads instead of overwriting the file you opened. | Keep packs in the project home folder, so that copy *is* the same file. |
 | **SpriteStudio reopens an old pack** when you open it from the hub. | Open your current pack with **Open .vbpack…**, or go in through the Project tool. |
 | **Tracks (animations) don't affect the game.** | They're previews only. |

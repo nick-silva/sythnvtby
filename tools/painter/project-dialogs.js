@@ -140,7 +140,7 @@ function applyHealthFix(issue) {
 }
 
 /**
- * File ▸ Project storage…: what the project's space is used for (src/project-storage.js,
+ * Project ▸ Project storage…: what the project's space is used for (src/project-storage.js,
  * tools/painter/storage-panel.js), and deleting a question's recordings.
  */
 export const storageDialog = /** @type {HTMLDialogElement|null} */ (document.getElementById('storage-dialog'));
@@ -175,7 +175,7 @@ export function openStorageDialog() {
 }
 
 /**
- * File ▸ Game states…: the project's game states, and the questions that find them
+ * Project ▸ Game states…: the project's game states, and the questions that find them
  * (src/memory-questions.js, tools/painter/game-states-panel.js). Questions and recordings live in
  * the pack's manifest, recordings' samples in memoryrecordings/; a captured frame added to a side
  * is read from its own memory dump.

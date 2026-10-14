@@ -232,7 +232,7 @@ await s.test('Memory: record a question’s sides while playing (timed, and unti
   await pg.waitForURL(/\/tools\/project\.html/, { timeout: 60000 });
   await pg.waitForFunction(() => !document.getElementById('btn-save-and-play')?.disabled, null, { timeout: 90000 });
   await pg.waitForTimeout(1500);
-  await pg.click('#file-menu > summary');
+  await pg.click('#project-menu > summary');
   await pg.click('#file-menu-game-states');
   await pg.waitForSelector('#game-states-dialog[open]');
   const sides = ((await pg.textContent('[data-question-id="q-who-is-it"] .gs-sides').catch(() => '')) || '').replace(/\s+/g, ' ');

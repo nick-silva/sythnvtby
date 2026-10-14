@@ -136,7 +136,7 @@ export function planSubState({ inside, outside, pools, states = [], label, descr
   const [poolId] = [...votes].sort((a, b) => b[1] - a[1])[0] || [];
   const pool = (pools || []).find((p) => p?.id === poolId);
   if (!pool) {
-    return { ok: false, reason: ins.length ? `none of the ${describe} is recognised as a screen — run File ▸ Analyze memory… first` : `none of the ${describe} has its game memory captured` };
+    return { ok: false, reason: ins.length ? `none of the ${describe} is recognised as a screen — run Project ▸ Analyze memory… first` : `none of the ${describe} has its game memory captured` };
   }
   const onScreen = (f) => f.matched?.has(poolId);
   const a = ins.filter(onScreen);

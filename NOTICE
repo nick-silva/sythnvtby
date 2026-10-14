@@ -69,6 +69,15 @@ by scripts/build-core.sh, which reproduces the shipped file bit for bit
 (docs/core/core-build.md).
 
 
+Compatible formats
+==================
+
+- VBoy Color colour packs (.vbcp) — read by File ▸ Import VBoy Color pack (src/vbcp.js), following
+  the layout in VBoy Color's core/emu/TileColorPack.cpp. No VBoy Color code or packs are included.
+  VBoy Color is GPL-3.0: https://github.com/yuk27/VBoyColor — colours imported from a pack are
+  theirs; projects record the import (vbcpImports in the manifest) so they stay credited.
+
+
 Not covered by this licence
 ===========================
 

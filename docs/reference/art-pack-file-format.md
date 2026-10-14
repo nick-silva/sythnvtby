@@ -1,7 +1,7 @@
 ---
 status: current
-last-reviewed: 2026-10-09
-covers: src/art-pack.js, src/group-schema.js, src/group-order.js, src/screen-gate.js, src/game-states.js, src/memory-questions.js, src/recovery.js, src/layer-art.js, src/touch-up.js, src/group-folders.js, src/transparent-paint.js, src/frame-cleanup.js, src/zip-read.js, src/zip-write.js, src/lazy-entries.js
+last-reviewed: 2026-10-13
+covers: src/art-pack.js, src/frame-summary.js, src/group-schema.js, src/group-order.js, src/screen-gate.js, src/game-states.js, src/memory-questions.js, src/recovery.js, src/layer-art.js, src/touch-up.js, src/group-folders.js, src/transparent-paint.js, src/frame-cleanup.js, src/zip-read.js, src/zip-write.js, src/lazy-entries.js
 ---
 
 # Art pack file format (.vbpack)
@@ -26,6 +26,7 @@ A **.vbpack** is a single ZIP file that bundles everything for a colorization pr
 | `manifest.json` | **Metadata**: version, gameId, name, romFileName, timestamps, and optional refs to current VIP/save state. Used for display (“Last pack: gameId”) and for Save and Play. | Recommended; readers tolerate missing. |
 | `painter-v2-rules.json` | **Painter v2 (alpha):** additive JSON rules blob. v0 shape: `{ schemaVersion: 1, tile8ByVariant: { [variantId]: { [hash]: { rgbaBase64 } | base64 } }, macroByVariant: {} }`. Parsed by `parseArtPack` as `painterV2Rules`; written when `buildArtPack({ painterV2Rules })` is set. Omitted from zip when absent. See `docs/design/painter-v2-spec.md`. | No. |
 | `painter-v2-vip-overlays.json` | **Legacy (Painter v2):** full-frame (384×224) RGBA **VIP authoring** per group + eye for anchor-BG overlay paint. The tools convert each entry to the group's `touchUp` on open (when a captured frame shows the anchor) and drop it on save; nothing writes new entries. Shape: `{ schemaVersion: 1, width, height, entries: [{ groupId, eye, rgbaBase64 }] }`. Does not replace `vipstate-current.json`; it is composited on top after load. | No. |
+| `framesummaries.json` | **What each captured frame shows, in brief** (src/frame-summary.js), so opening a project does not decode every frame. `{ version: 1, frames: { "<frame file>": { n, b, h, w, a, x } } }`: `n` the frame text's length (a summary whose `n` no longer matches is ignored and the frame read again), `b` its master brightness, `h` every pattern its draws use, `w` the left eye's non-blank patterns and tile slots per `"world|layer"` (`*` when a draw has none), `a` 1 when a layer is scaled, `x` the patterns scaled layers show without a draw record. Written by both tools' Save and carried through by the emulator; frames without one are summarised in the background and saved next time. | No. |
 | `vipstate-current.json` | **Current frame snapshot**: one VIP state (pattern table, draw list, segments, etc.) as JSON. The “current” frame when the pack was saved. The painter uses it as the frame to edit; the emulator can show it in the Frame / Save state list. | No. |
 | `save-state.state` | **Current emulator save state**: core save state (binary). Restored after Save and Play so the game is at the exact frame you edited. Also used when you pick “Current” (or the frame that has this state) in the Frame / Save state dropdown. | No. |
 
@@ -100,7 +101,7 @@ Readers that do not know about references ignore both the folder and the manifes
 | `painterV2LastVipFile` | string | **Painter v2 only:** VIP leaf filename last selected in the frame dropdown (e.g. `vipstates/title.json` or `vipstate-current.json`). Reopens that frame after load; does not change which file is the pack’s “current” VIP for the emulator (`currentVipStateRef` / root `vipstate-current.json` stay as-is). |
 | `currentSaveStateRef` | string | Entry name for the current save state (e.g. `save-state.state`). |
 | `frameRegistry` | array | Optional list of per-capture metadata (`frameId`, `stateName`, `subStateName`, file paths). |
-| `archivedCoverage` | object | Optional. `{ bg, obj, affine }`, each a sorted list of tile pattern hashes (uint32) that frames taken out by *File ▸ Clean up frames* showed, so auto-capture still counts them as captured. Added to on every clean-up; the emulator keeps it. |
+| `archivedCoverage` | object | Optional. `{ bg, obj, affine }`, each a sorted list of tile pattern hashes (uint32) that frames taken out by *Project ▸ Clean up frames* showed, so auto-capture still counts them as captured. Added to on every clean-up; the emulator keeps it. |
 | `archivedFrames` | object | Only in an archive pack written by *Clean up frames*: `{ from, at, count }` — the project file it came from, when (ISO 8601) and how many frames. Such a pack holds just those frames (no ROM, groups or paint); *File ▸ Import from another pack* brings them back. |
 | `memoryQuestions` | array | Questions asked of the game's memory (src/memory-questions.js): `[{ "id", "name", "sides": [{ "id", "name" }], "createdAt" (ISO 8601), "status": "collecting" \| "saved" }]`. Each side becomes a game state when saved. |
 | `memoryRecordings` | array | Recordings answering them: `[{ "id", "question", "side", "startedAt" (ISO 8601), "seconds", "samples", "session", "source": "record" \| "frame", "frameId"? }]`. A `record` recording's samples are in `memoryrecordings/<id>.bin`; a `frame` one with a `frameId` is read from that frame's memory dump. Never copied into a play pack. |

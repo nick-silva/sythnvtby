@@ -106,7 +106,8 @@ under `native/` for the PC player.
 | `vbcolor-pack.js` | The `.vbcolor` colour table (pattern hash → 8×8 RGBA). |
 | `vip-state.js`, `vip-dump.js`, `vip-world-clip.js`, `vip-edge-tiles.js` | VIP state from the core: tiles, hashing, flips, serialization, world clipping, and the edge tiles the draw list leaves out. |
 | `frame-numbers.js`, `frame-metadata.js`, `frame-wram.js`, `screenshot-frame.js` | A frame's short number (`#57`), its name, tags and reference images, its WRAM, and its screenshot read back to exact pixels. |
-| `frame-cleanup.js`, `pack-merge.js` | File ▸ Clean up frames (what can go, the archive pack) and File ▸ Import from another pack. |
+| `frame-cleanup.js`, `pack-merge.js` | Project ▸ Clean up frames (what can go, the archive pack) and File ▸ Import from another pack. |
+| `vbcp.js`, `vbcp-import.js` | Reading VBoy Color's `.vbcp` colour packs (same tile hash as ours) and File ▸ Import VBoy Color pack: shared colours for tiles with none; no groups. Tests build packs with `tests/fixtures/vbcp.js`. |
 | `rom-identity.js`, `play-pack.js` | The ROM's SHA-1/CRC32, and the play pack (`.vbcplay`) the player reads. |
 | `pack-validator.js`, `tile-extractor.js`, `vb-2bpp.js` | The tools hub's validator, tile extractor and frame viewer helpers. |
 
@@ -122,7 +123,9 @@ under `native/` for the PC player.
 | `layer-art.js`, `layer-art-edit.js`, `layer-art-png.js` | The picture store's pixels, painting on them, and PNG/clipboard. (Layer art itself is an older kind, converted to overpaint on open.) |
 | `touch-up.js`, `painter-v2-vip-overlay.js` | Older paint kinds still read: touch-ups and screen-pinned VIP overlays. |
 | `transparent-paint.js`, `starter-paint.js`, `shade-ramp.js` | Paint on see-through pixels, the starter shades a tile begins with, and colour by shade for tiles the game rewrites. |
+| `frame-summary.js` | What each frame shows, in brief, saved in the pack (`framesummaries.json`) so opening a project need not decode every frame; one summary serves SpriteStudio's frame filter, the Project tool's screen index and the brightness reference. |
 | `uncoloured.js`, `pixel-explain.js` | How much of a frame is uncoloured; "what colours this pixel, or why not" (*This pixel*, Pick). |
+| `pose-suggest.js` | Find poses: a background character's poses not kept yet, and poses kept twice, folded into their twin. |
 | `pose-autopaint.js`, `original-view.js` | Auto-paint: a group's unpainted poses coloured from its painted ones, pixel by pixel from what surrounds each; a pose's original monochrome picture (SpriteStudio's *Original*). |
 
 ### `src/` — groups, poses and when paint shows
@@ -179,6 +182,7 @@ UI-free view of a loaded pack (frames, groups, paint, a frame renderer). Its par
 | `overpaint.js`, `recovery.js` | Overpaint and pose pictures (through `src/picture-store.js`); recovered pictures and the Overpaint panel. |
 | `group-list.js`, `tracks.js` | The group lists, folders and search; animation tracks. |
 | `reference.js`, `ghost-box.js` | Reference images; side by side and the ghost box. |
+| `find-poses.js` | The Find poses window: new poses and duplicates to tick, one Apply (`src/pose-suggest.js`). |
 | `autopaint.js` | The Auto-paint window: which poses to learn from and which to paint, progress, one undo step (`src/pose-autopaint.js`). |
 
 ### `tools/` — shared and other pages

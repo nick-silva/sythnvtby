@@ -138,6 +138,8 @@ function applyHistoryEntry(entry, verb) {
   ctx.drawStage();
   renderStrip();
   ctx.renderPalette();
+  // Pose details count the card's unpainted pixels (Painting complete), which the step changed.
+  ctx.renderDetail();
   ctx.setStatus(`${verb} the last stroke.`);
   return inverse;
 }

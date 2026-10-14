@@ -27,6 +27,7 @@ import { affinePixelMap, affineStandInDraws, affineWorlds } from '../../src/affi
 import { affineBaseDraws, affineBaseState } from '../../src/affine-base.js';
 import { getWindowsTableBytesFromState } from '../../src/vip-world-clip.js';
 import { brightnessReference, masterBrightnessLevels } from '../../src/fade.js';
+import { summarizeFrameForPack, savedSummaryFor, toPatternSummary, brightnessLevelsFor, frameSummariesJson, parseFrameSummaries } from '../../src/frame-summary.js';
 import { findFrameWram, frameStem } from '../../src/frame-wram.js';
 import { setProjectGameStates } from '../../src/game-states.js';
 import { isStarterColour, STARTER_SHADES, convertOldStarterShades } from '../../src/starter-paint.js';
@@ -137,9 +138,18 @@ export async function loadPackSession(buffer, label = 'pack.vbpack') {
     _stateCache: new RecentMap(STATE_CACHE_FRAMES),
     /** Frame index → summarizeFrame(), for skipping frames that cannot show a group. */
     _summaries: new Map(),
+    /** Frame summaries saved in the pack (src/frame-summary.js), by frame file; null for an older pack. */
+    _savedSummaries: parseFrameSummaries(parsed.frameSummaries),
+    /** Summaries worked out this session, by frame file, saved with the pack. */
+    _freshSummaries: new Map(),
     /** @type {null | { pixels: number, tiles: number, unknown: number }} stray paint cleared on open */
     strayTransparentCleared: null,
   };
+  // Frames with a saved summary are known without decoding them.
+  session.frames.forEach((f, i) => {
+    const s = savedSummaryFor(session._savedSummaries, f.vipFile, frameTextLength(f));
+    if (s) session._summaries.set(i, toPatternSummary(s));
+  });
   clearStrayTransparentPaint(session);
   // Starter shades from before Oct 9 2026 move to the new ones, which no one picks by accident.
   const starters = convertOldStarterShades(session.pack, session.groups, decodeGroupTileColors);
@@ -180,7 +190,8 @@ export function frameState(session, frameIndex) {
     // Fades are measured against the game's normal brightness (src/fade.js), so a game that
     // always runs dim still shows painted white as white.
     if (session.brightnessReference === undefined) {
-      session.brightnessReference = brightnessReference(masterBrightnessLevels(session.frames.map((f) => f.json)));
+      // Saved summaries carry each frame's level, so only frames without one are read.
+      session.brightnessReference = brightnessReference(brightnessLevelsFor(session.frames, session._savedSummaries, masterBrightnessLevels));
     }
     state.brightnessReference = session.brightnessReference;
     session._stateCache.set(row.vipFile, state);
@@ -253,7 +264,9 @@ export function buildFrameSummaries(session, sliceMs = 8) {
           // A frame being worked on is in the state cache already; others are decoded and let go.
           const cached = session._stateCache.has(session.frames[at].vipFile);
           const state = cached ? frameState(session, at) : deserializeVIPState(JSON.parse(session.frames[at].json));
-          session._summaries.set(at, summarizeFrame(state, true));
+          const packed = summarizeFrameForPack(state, frameTextLength(session.frames[at]));
+          session._freshSummaries.set(session.frames[at].vipFile, packed);
+          session._summaries.set(at, toPatternSummary(packed));
           done++;
         } catch {
           /* an unreadable frame is looked at in full when asked about */
@@ -660,15 +673,7 @@ export function bgGroupView(session, group, eye = 0) {
  * @returns {Array<{ pose: any, frameIndex: number, origin: {x: number, y: number}, matched: number, total: number }>}
  */
 export function bgGroupViews(session, group, eye = 0) {
-  const crit = bgGroupCriteria(group);
-  if (!crit) return [];
-  let hits = [];
-  for (let i = 0; i < session.frames.length; i++) {
-    // Frames that cannot show any of its patterns are not decoded (src/lazy-entries.js keeps them compressed).
-    if (!mayShowPatterns(session, i, crit.hashes, { standIns: true })) continue;
-    const hit = bgViewOnFrame(session, group, crit, i, eye);
-    if (hit && hit.patterns.size) hits.push(hit);
-  }
+  let hits = bgGroupFrameHits(session, group, eye);
   // A pose's group (Overpaint just this pose) shows only the frames its whole pose is on, where its
   // picture shows: a frame with a few of its tiles (another pose sharing them) is not this pose.
   if (wholePoseHashes(group)) {
@@ -690,6 +695,28 @@ export function bgGroupViews(session, group, eye = 0) {
     const label = session.frames[view.frameIndex]?.label || `Frame ${view.frameIndex + 1}`;
     return { ...view, pose: { ...view.pose, poseId: `__frame:${view.frameIndex}`, name: label } };
   });
+}
+
+/**
+ * A BG group on every captured frame that shows it: one hit per frame (its view, the patterns it
+ * shows there, its scroll), before bgGroupViews keeps only frames that show something new.
+ * @param {any} session @param {any} group @param {number} [eye]
+ * @param {{ only?: (frameIndex: number) => boolean }} [opts] `only`: look at just the frames it allows
+ *   (checked before a frame is decoded)
+ * @returns {Array<{ score: number, scroll: string, onFrame: Set<number>, patterns: Set<number>, view: any }>}
+ */
+export function bgGroupFrameHits(session, group, eye = 0, { only = null } = {}) {
+  const crit = bgGroupCriteria(group);
+  if (!crit) return [];
+  const hits = [];
+  for (let i = 0; i < session.frames.length; i++) {
+    if (only && !only(i)) continue;
+    // Frames that cannot show any of its patterns are not decoded (src/lazy-entries.js keeps them compressed).
+    if (!mayShowPatterns(session, i, crit.hashes, { standIns: true })) continue;
+    const hit = bgViewOnFrame(session, group, crit, i, eye);
+    if (hit && hit.patterns.size) hits.push(hit);
+  }
+  return hits;
 }
 
 /**
@@ -986,11 +1013,25 @@ export async function buildPackBlob(session, opts = {}) {
     // Live authoring buffers become the stored base64 form on the way into groups.json.
     groups: session.groups.map(groupWithEncodedTileColors),
     groupsSchemaVersion: requiredGroupsSchemaVersion(session.groups, session.parsed?.groupsSchemaVersion),
+    // What each frame shows, so the next open need not decode them (src/frame-summary.js).
+    ...withFrameSummaries(session),
     ...(session.gameStatePools?.length ? { gameStatePools: session.gameStatePools } : {}),
     // Pictures set aside instead of saved wrong (src/recovery.js); what was put back or discarded goes.
     // Files the tool could not read are written back as they were.
     ...(Array.isArray(session.recovered) && { recoveryFolder: [...recoveryFolderFrom(session.recovered), ...(session.recoveryUnreadable || [])] }),
   }, opts);
+}
+
+/** A frame's text length, its summary's fingerprint, read without decompressing the frame. */
+function frameTextLength(row) {
+  return row.jsonSize ?? (typeof row.json === 'string' ? row.json.length : 0);
+}
+
+/** `{ frameSummaries }` for the pack: this session's summaries, else the saved ones that still match. */
+function withFrameSummaries(session) {
+  const rows = session.frames.map((f) => ({ vipFile: f.vipFile, jsonSize: frameTextLength(f) }));
+  const json = frameSummariesJson(rows, session._savedSummaries, session._freshSummaries);
+  return json ? { frameSummaries: json } : {};
 }
 
 /** Tile-index → pattern hash, memoized for one state. */

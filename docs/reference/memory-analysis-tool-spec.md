@@ -284,7 +284,7 @@ Markdown should list candidates with CPU address, hex dump of per-state values, 
 
 ## 11. Implementation phases
 
-*Status Oct 2026:* 1a–1c are built — the Project tool runs the same analyzer from **File ▸ Analyze memory** on the open pack (`tools/memory-analysis-inbrowser.js`), and its results seed memory pools. 1d exists as a legacy CLI. Game states (named memory conditions that groups can depend on) went further than phase 3: see [memory-states.md](../design/memory-states.md).
+*Status Oct 2026:* 1a–1c are built — the Project tool runs the same analyzer from **Project ▸ Analyze memory** on the open pack (`tools/memory-analysis-inbrowser.js`), and its results seed memory pools. 1d exists as a legacy CLI. Game states (named memory conditions that groups can depend on) went further than phase 3: see [memory-states.md](../design/memory-states.md).
 
 | Phase | Deliverable |
 |-------|-------------|

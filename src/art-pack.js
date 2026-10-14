@@ -85,6 +85,11 @@ export const PACK_ENTRIES = {
    * JSON: `{ schemaVersion: 1, width, height, entries: [{ groupId, eye, rgbaBase64 }] }`.
    */
   PAINTER_V2_VIP_OVERLAYS: 'painter-v2-vip-overlays.json',
+  /**
+   * What each captured frame shows, in brief (src/frame-summary.js), so opening a project does not
+   * decode every frame. Optional and rebuilt for any frame it does not match; old tools ignore it.
+   */
+  FRAME_SUMMARIES: 'framesummaries.json',
 };
 
 /** Current document shape for {@link PACK_ENTRIES.PAINTER_V2_RULES}; forward-compatible fields allowed. */
@@ -143,7 +148,7 @@ export async function parseArtPack(buffer) {
 
 /** @param {{ file: Function, files: Record<string, unknown>, filter: Function }} zip a JSZip, or src/zip-read.js's reader */
 async function parseArtPackFrom(zip) {
-  const [rom, vbcolor, overridesRaw, manifestRaw, vipStateRaw, saveStateBuf, groupsRaw, painterV2RulesRaw, painterV2VipOverlaysRaw] =
+  const [rom, vbcolor, overridesRaw, manifestRaw, vipStateRaw, saveStateBuf, groupsRaw, painterV2RulesRaw, painterV2VipOverlaysRaw, frameSummariesRaw] =
     await Promise.all([
       getRomFromZip(zip),
       getVbcolorFromZip(zip),
@@ -154,6 +159,7 @@ async function parseArtPackFrom(zip) {
       findZipFile(zip, PACK_ENTRIES.GROUPS)?.async('string') ?? null,
       findZipFile(zip, PACK_ENTRIES.PAINTER_V2_RULES)?.async('string') ?? null,
       findZipFile(zip, PACK_ENTRIES.PAINTER_V2_VIP_OVERLAYS)?.async('string') ?? null,
+      findZipFile(zip, PACK_ENTRIES.FRAME_SUMMARIES)?.async('string') ?? null,
     ]);
 
   let overrides;
@@ -291,6 +297,7 @@ async function parseArtPackFrom(zip) {
     ...(painterV2Rules !== undefined && { painterV2Rules }),
     ...(painterV2VipOverlaysRaw != null &&
       painterV2VipOverlaysRaw.length > 0 && { painterV2VipOverlays: painterV2VipOverlaysRaw }),
+    ...(frameSummariesRaw != null && frameSummariesRaw.length > 0 && { frameSummaries: frameSummariesRaw }),
     groupsJsonInPack,
   };
 }
@@ -344,6 +351,7 @@ export function artPackPartsFromParsed(parsed) {
   if (typeof parsed.painterV2VipOverlays === 'string' && parsed.painterV2VipOverlays.length > 0) {
     parts.painterV2VipOverlays = parsed.painterV2VipOverlays;
   }
+  if (typeof parsed.frameSummaries === 'string' && parsed.frameSummaries.length > 0) parts.frameSummaries = parsed.frameSummaries;
   return parts;
 }
 
@@ -565,6 +573,9 @@ export async function buildArtPack(parts, opts = {}) {
   }
   if (typeof parts.painterV2VipOverlays === 'string' && parts.painterV2VipOverlays.length > 0) {
     zip.file(PACK_ENTRIES.PAINTER_V2_VIP_OVERLAYS, parts.painterV2VipOverlays);
+  }
+  if (typeof parts.frameSummaries === 'string' && parts.frameSummaries.length > 0) {
+    zip.file(PACK_ENTRIES.FRAME_SUMMARIES, parts.frameSummaries);
   }
 
   const onUpdate = typeof opts?.onUpdate === 'function' ? opts.onUpdate : null;

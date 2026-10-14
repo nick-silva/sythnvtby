@@ -15,12 +15,12 @@ you decide what to keep.
 **Built Oct 8 2026** (steps 1–6 of §7, with the changes below): game states and group conditions
 in every reader including the native player (`src/game-states.js`; parity checked on Mario's Tennis
 with a condition that changes 408 of 472 eye images: 0 pixels different); questions and recordings
-(`src/memory-questions.js`) in **File ▸ Game states…**; **Record** and the live **Now** in the
+(`src/memory-questions.js`) in **Project ▸ Game states…**; **Record** and the live **Now** in the
 emulator's Memory panel (`src/memory-recorder.js`, `src/memory-panel.js`); **File ▸ Project
 storage…** (`src/project-storage.js`); Check project's *Tell them apart…* and unrecognised frames.
 
 Changed from this plan while building it:
-- **The memory tool lives in the Project tool** (File ▸ Game states…), not in
+- **The memory tool lives in the Project tool** (Project ▸ Game states…), not in
   `tools/memory-analysis.html`: that page opens its own copy of the pack and could only hand results
   back as a download. The old page stays for the per-screen analysis.
 - **No summaries yet** (§6.3). Measured on Mario's Tennis memory: 10 samples taken far apart make
@@ -66,7 +66,7 @@ never need it.
 
 | When | What the person wants | What they do | Cost |
 |---|---|---|---|
-| **Setting up** — after the first capture session | The tools to know which screen a frame is | File ▸ Analyze memory (exists) | Seconds, once |
+| **Setting up** — after the first capture session | The tools to know which screen a frame is | Project ▸ Analyze memory (exists) | Seconds, once |
 | **Paint is wrong in one state of a screen** — Check project or This pixel shows a group colouring frames it shouldn't, and the difference is a state | A condition on that group | Open or start a **question** (§4), record, check live, attach | A few play sessions; only for groups that clearly need it |
 | **A screen recipe misses frames** — Check project: "22 frames no screen recognises" | A recipe that recognises every frame of its screen | Re-learn the screen from recordings (§4.4) | One play session |
 | **Before sharing** | To know every screen and game state switches when it should | Play through with the **live panel** (§5.1) open | One play-through |
@@ -276,7 +276,7 @@ else: record while on that screen, and while elsewhere; saving replaces the scre
 
 ### 5.2 The memory tool (`tools/memory-analysis.html`, grown)
 
-**Built as the Project tool's File ▸ Game states… window** (see the note at the top). It holds the questions:
+**Built as the Project tool's Project ▸ Game states… window** (see the note at the top). It holds the questions:
 sides, recordings (browse, move, drop), the analysis panel (§4.1–4.2), **Save as game states**, the
 list of game states with which groups use them and when they were last checked live, and
 re-learning a screen (§4.4).
@@ -309,7 +309,7 @@ Mario's Tennis today (compressed, in the pack):
 | Memory dumps | 236 | 1.3 MB | 5 KB |
 | groups.json (paint, pictures) | 1 | 0.5 MB | — |
 
-### 6.2 File ▸ Project storage…
+### 6.2 Project ▸ Project storage…
 
 One window, each kind with its size, count and what it is for:
 

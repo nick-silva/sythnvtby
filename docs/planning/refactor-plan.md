@@ -1,6 +1,6 @@
 ---
 status: proposed
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: src/main.js, src/color-layer.js, src/uncoloured.js, src/screen-gate.js, tools/painter.js, tools/painter/, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, native/core/src/colorizer.cpp, tests/e2e/harness.mjs
 ---
 

@@ -23,7 +23,7 @@ The loop exists; the rest of this doc is the original vision, kept for its reaso
    playing** with keyboard focus on the game.
 
 **Not built:** the "paused until input" step below (resuming straight away was preferred).
-Pruning old captures is **File ▸ Clean up frames…** in the Project tool (Oct 2026). The override-art editing
+Pruning old captures is **Project ▸ Clean up frames…** in the Project tool (Oct 2026). The override-art editing
 in §4 belonged to Paint v1, which has been removed.
 
 ---

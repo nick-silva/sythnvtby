@@ -1,5 +1,5 @@
 /**
- * The Project tool's "Game states" window (File ▸ Game states…; docs/design/memory-states.md §5.2):
+ * The Project tool's "Game states" window (Project ▸ Game states…; docs/design/memory-states.md §5.2):
  * the project's game states, and the questions that find them — each question's sides with their
  * recordings, what the analysis (src/memory-questions.js) says still fits, near misses, and Save
  * as game states. Built from DOM nodes: names are user text. The Project tool owns the data and

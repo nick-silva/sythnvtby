@@ -91,7 +91,7 @@ await s.test('Pack validator checks a .vbcolor pack against a VIP dump', async (
 await s.test('Project tool runs the memory analysis into the pack it has open', async () => {
   const page = await newPage();
   await openPainter(page, PACK_PLAIN);
-  await page.click('#file-menu > summary');
+  await page.click('#project-menu > summary');
   await page.waitForTimeout(200);
   expect(!(await page.isDisabled('#file-menu-analyze-memory')), 'Analyze memory is disabled for a pack with captured frames');
   await page.click('#file-menu-analyze-memory');

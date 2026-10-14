@@ -15,6 +15,8 @@ import { paintOriginal } from '../../src/original-view.js';
 import { getWindowsTableBytesFromState } from '../../src/vip-world-clip.js';
 import { overpaintPanel, selectedArt, showTouchUps } from './overpaint.js';
 import { folderPicker } from './group-list.js';
+import { completePose, isUnpaintedPixel } from './painting.js';
+import { canFindPoses, openFindPoses } from './find-poses.js';
 import { deletePose, isAnimatedGroup, isDeletablePose, isFrameCard, keepFrameAsPose, keepPatternsInNoPoseAsPoses, poseMovePicker, removePatternsInNoPose, renamePose, storedPose } from './poses.js';
 
 /** SpriteStudio's state and functions this part uses (tools/sprite-studio.js passes them in). */
@@ -135,7 +137,10 @@ export function composePoseLayer(view) {
   const state = view.origin && view.frameIndex >= 0 ? frameState(ctx.session, view.frameIndex) : null;
   if (!state) return false;
   const key = `${view.frameIndex}|${view.pose.poseId}|${view.origin.x},${view.origin.y}|${ctx.eye()}|${ctx.brightness()}|${showTouchUps()}|${showUnpainted()}|${ctx.ownPaintOnly()}`;
-  if (key === poseLayerKey) return true;
+  if (key === poseLayerKey) {
+    view.unpainted = poseLayerUnpainted;
+    return true;
+  }
   const ok = renderPoseLayer({
     session: ctx.layerSession(),
     state,
@@ -150,11 +155,36 @@ export function composePoseLayer(view) {
   });
   // Pixels coloured by layer art, a touch-up or the left eye (a stereo twin) are not their tile's paint.
   const covered = getCompositePixelInfo().art;
+  // The card's unpainted pixels (its cyan mark, Painting complete), counted before the tint changes them.
+  poseLayerUnpainted = ok ? countUnpainted(view, state, covered) : 0;
+  view.unpainted = poseLayerUnpainted;
   if (ok && showUnpainted()) tintStarterPixels(view, state, ctx.poseImage, covered);
   ctx.poseCtx.clearRect(0, 0, FRAME_W, FRAME_H);
   ctx.poseCtx.putImageData(ctx.poseImage, 0, 0);
   poseLayerKey = key;
   return ok;
+}
+
+/** Unpainted pixels of the pose layer composed last, for a card that composes to the same layer again. */
+let poseLayerUnpainted = 0;
+
+/**
+ * Lit pixels of a card nothing has chosen a colour for (no paint, clear, or a starting grey) that
+ * no picture covers — what Painting complete would keep, and what the card's cyan mark stands for.
+ */
+function countUnpainted(view, state, covered = null) {
+  const bounds = poseBounds(view.pose, view.origin);
+  if (!bounds) return 0;
+  const lookup = poseTileLookup(state, view.pose, view.origin, ctx.eye());
+  let n = 0;
+  for (let y = Math.max(0, bounds.y0); y < Math.min(FRAME_H, bounds.y1); y++) {
+    for (let x = Math.max(0, bounds.x0); x < Math.min(FRAME_W, bounds.x1); x++) {
+      if (covered?.[y * FRAME_W + x]) continue;
+      const hit = lookup(x, y);
+      if (hit && isUnpaintedPixel(hit)) n++;
+    }
+  }
+  return n;
 }
 
 /** Show unpainted: tiles with no paint in red, as the Project tool shows them, and leftover starting greys tinted. */
@@ -644,6 +674,28 @@ export function renderDetail() {
     keep.title = "Save this frame as one of the group's poses. A group with poses shows just those in the filmstrip.";
     keep.addEventListener('click', () => keepFrameAsPose(view));
     host.append(keep);
+  }
+  if (view.origin && view.frameIndex >= 0 && !selectedArt()?.hideTiles) {
+    const left = view.unpainted || 0;
+    const done = document.createElement('button');
+    done.type = 'button';
+    done.id = 'btn-pose-complete';
+    done.textContent = left ? `Painting complete (${left.toLocaleString()} px left)` : 'Painting complete ✓';
+    done.disabled = !left;
+    done.title = left
+      ? 'Keep every pixel still unpainted on this pose at the grey it shows now, as paint of its own, so it stops counting as unpainted. Tiles other poses share keep that grey too. Undo takes it back.'
+      : 'Every pixel of this pose has a colour.';
+    done.addEventListener('click', completePose);
+    host.append(done);
+  }
+  if (canFindPoses(ctx.selectedGroup)) {
+    const find = document.createElement('button');
+    find.type = 'button';
+    find.id = 'btn-find-poses';
+    find.textContent = 'Find poses…';
+    find.title = 'Look through the captured frames for poses of this character that are not kept yet, and for poses kept twice';
+    find.addEventListener('click', openFindPoses);
+    host.append(find);
   }
   const stored = storedPose(pose);
   if (isDeletablePose(stored) && !isAnimatedGroup(ctx.selectedGroup)) {

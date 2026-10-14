@@ -1,6 +1,6 @@
 ---
 status: partial
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: tools/painter.js, tools/painter/, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/reference-fill.js, src/screenshot-frame.js, src/art-pack.js
 ---
 

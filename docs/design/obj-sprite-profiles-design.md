@@ -1,6 +1,6 @@
 ---
 status: partial
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: src/obj-sprite-profiles.js, src/pose-source-frames.js, src/pattern-set.js, src/flood-fill.js, src/shade-ramp.js, tools/shared/project-return.js, tools/shared/animated-tiles.js, tools/shared/pack-session.js, tools/sprite-studio.js, tools/sprite-studio/, src/affine-base.js
 ---
 

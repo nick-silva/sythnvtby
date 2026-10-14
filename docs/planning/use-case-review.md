@@ -1,6 +1,6 @@
 ---
 status: living
-last-reviewed: 2026-10-10
+last-reviewed: 2026-10-13
 covers: index.html, src/main.js, src/color-layer.js, src/art-pack.js, tools/project.html, tools/painter.js, tools/painter/, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js
 ---
 

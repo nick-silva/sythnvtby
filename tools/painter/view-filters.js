@@ -4,7 +4,7 @@
  */
 import { getTileBytes, hashTile } from '../../src/vip-state.js';
 import { getBgAffineWorldClipRect, getWindowsTableBytesFromState } from '../../src/vip-world-clip.js';
-import { brightnessReference, masterBrightnessLevels } from '../../src/fade.js';
+import { brightnessReferenceFor } from './frame-summaries.js';
 import { normWorldKey } from './selection.js';
 
 /** The tool's state and functions this part uses (tools/painter.js passes them in). */
@@ -99,7 +99,7 @@ export function filterStateForView(state, opts = {}) {
 let brightnessRefFor = /** @type {{ frames: any[], ref: number|null } | null} */ (null);
 function packBrightnessReference() {
   if (brightnessRefFor?.frames !== ctx.availableFrames) {
-    brightnessRefFor = { frames: ctx.availableFrames, ref: brightnessReference(masterBrightnessLevels(ctx.availableFrames.map((f) => f.json))) };
+    brightnessRefFor = { frames: ctx.availableFrames, ref: brightnessReferenceFor(ctx.loadedPackParts, ctx.availableFrames) };
   }
   return brightnessRefFor.ref;
 }

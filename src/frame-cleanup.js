@@ -1,5 +1,5 @@
 /**
- * File ▸ Clean up frames: which captured frames a project can do without, and taking them out —
+ * Project ▸ Clean up frames: which captured frames a project can do without, and taking them out —
  * deleted, or moved into a separate archive .vbpack that File ▸ Import from another pack brings
  * back.
  *
