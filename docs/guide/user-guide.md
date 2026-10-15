@@ -1,7 +1,7 @@
 ---
 status: current
-last-reviewed: 2026-10-13
-covers: src/pixel-explain.js, src/project-health.js, src/sub-state-learn.js, src/game-states.js, src/memory-questions.js, src/memory-recorder.js, src/memory-panel.js, src/project-storage.js, tools/painter/game-states-panel.js, tools/painter/storage-panel.js, src/screen-gate.js, src/group-order.js, tools/painter/health-panel.js, src/recovery.js, src/work-journal.js, index.html, src/main.js, src/frame-capture.js, src/auto-capture.js, src/frame-step.js, tools/index.html, tools/project.html, tools/painter.js, tools/painter/, tools/painter/sprite-profiles-ui.js, tools/sprite-studio.html, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/art-pack.js, src/group-folders.js, src/group-screens.js, src/layer-art.js, src/paint-gaps.js, src/project-journal.js, src/frame-numbers.js, src/starter-paint.js
+last-reviewed: 2026-10-15
+covers: src/shared-tile-owner.js, src/pixel-explain.js, src/project-health.js, src/sub-state-learn.js, src/game-states.js, src/memory-questions.js, src/memory-recorder.js, src/memory-panel.js, src/poses-panel.js, src/frame-poses.js, src/project-storage.js, tools/painter/game-states-panel.js, tools/painter/storage-panel.js, src/screen-gate.js, src/group-order.js, tools/painter/health-panel.js, src/recovery.js, src/work-journal.js, index.html, src/main.js, src/frame-capture.js, src/auto-capture.js, src/frame-step.js, tools/index.html, tools/project.html, tools/painter.js, tools/painter/, tools/painter/sprite-profiles-ui.js, tools/sprite-studio.html, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/art-pack.js, src/group-folders.js, src/group-screens.js, src/layer-art.js, src/paint-gaps.js, src/project-journal.js, src/frame-numbers.js, src/starter-paint.js
 ---
 
 # User guide: coloring a Virtual Boy game
@@ -179,8 +179,8 @@ between pages. Save and Play also writes the file to disk.
 
 | Control | What it does |
 |---------|--------------|
-| **Load ROM** | Starts a **new, empty** project from a `.vb` file. Throws away unsaved captures. |
-| **Load pack** | Opens a `.vbpack` project. It boots the pack's ROM, loads all its paint, and switches to Color if the pack has colors. The pack is remembered as **Last pack: …** for next time. |
+| **Load ROM** | Starts a **new, empty** project from a `.vb` file. Throws away unsaved captures. If a game is already running, the page **reloads** first, so only one game ever runs. |
+| **Load pack** | Opens a `.vbpack` project. It boots the pack's ROM, loads all its paint, and switches to Color if the pack has colors. The pack is remembered as **Last pack: …** for next time. If a game is already running, the page **reloads** first, so only one game ever runs. |
 | **Last pack: …** | Reopens the last pack. If a game is running it **reloads the page**, which also throws away unsaved captures. |
 | **Display: Monochrome / Palette / Color** | **Color** shows your paint. **Monochrome** shows the original red picture underneath; turn on both to see unpainted holes. **Palette** is a separate toy that recolors the four red shades with a preset (green, Game Boy, …). It doesn't use your paint. |
 | **View: 2D / Side-by-side / Anaglyph** | 3D, for the red picture and the colour alike. **Side-by-side** shows the left eye, then the right; **Anaglyph** mixes them for red/cyan glasses (under **Palette**, Anaglyph shows one eye). Stay on **2D** while capturing and coloring: a capture taken in Side-by-side keeps the left eye's screenshot, and one taken in Anaglyph has no screenshot. See [3D: both eyes](#3d-both-eyes). |
@@ -189,6 +189,7 @@ between pages. Save and Play also writes the file to disk.
 | **Pause / ◂ Step / Step ▸** | Land on exactly the frame you want. **P** pauses and resumes; **.** steps forward one frame and **,** steps back one (hold to keep stepping; **Shift** steps 10). The emulator keeps the last 3 seconds of frames while it runs, so you can step back to something that just flew past. The readout shows the frame and how far back you can go. **Capture Frame** or **F8** then saves exactly the frame on screen, and the game stays paused. Opening a captured frame from the frame list also pauses there, ready to step. The keys don't reach the game. |
 | **Auto-capture** | First asks what you're trying to capture: **Background (BG)**, **Sprite (OBJ)** or **Scaled (Affine)** tiles, or **All of the above** (it remembers your choice). Then play normally. The game pauses whenever a tile of those kinds you've never captured appears, outlines it in magenta, and asks you to name the capture. Works best after a first manual pass. **Where paint doesn't cover yet** (on its own or with the others) also stops where the colour falls short: a tile with no paint at all, or a backdrop scrolled past the part of its overpaint picture that was painted — capture it, then paint the missing part. Each gap stops the game once per session. **Stop auto-capture** (or Esc) turns it off. |
 | **Memory** | Opens the Memory panel: record the game's memory for a question's side while you play, and see live which screen and game states hold. See [Questions and recordings](#questions-and-recordings-telling-game-states-apart). |
+| **Poses** | Opens the Poses panel (Color on): for the frame on screen, each character whose saved pose is whole there — which pose, on which layer (or where, for a sprite, and whether mirrored) — and whether that pose's picture was drawn, or why not: a fuller pose's picture won, the group is hidden by its screens or game states, or two poses have exactly the same tiles (both pictures draw). It follows the game live; **Pause** and **Step** to look at one frame, and **Copy** puts the report with the frame number on the clipboard. |
 | **Colorize!** | Pauses and opens the Project tool on this exact moment, bringing your captures (and memory recordings) along. |
 | **Export .vbpack** | Saves the current project (ROM + captures + paint) to a file without leaving the page. Use it to keep captures when you're not ready to press Colorize!. |
 | **Project home** | Chooses the folder where file dialogs start and where saves land (Chrome/Edge only). After a browser restart it may say "needs permission". Click **Grant access**. |
@@ -609,9 +610,18 @@ tiles. It shows what it would bring and whether the pack was made for this proje
 ### Which group wins a shared tile
 
 Two groups can include the same tile pattern on the same layer — a letter both *NORMAL* and
-*HARD* use, a player's shoe that Mario's and Luigi's groups both have. Where both paint it, **the
-group listed first wins**, and the other's paint for that tile never shows. The order is the
-order of the groups in the project (`groups.json`); nothing else decides it.
+*HARD* use, a player's shoe that Mario's and Luigi's groups both have. Where both paint it
+differently, **the tiles next to it decide**: if a tile beside it (left, right, above, below, or
+failing those a corner) belongs to only one of the two groups, that group colours it. So the R in
+*HARD* takes HARD's colours because H and D sit beside it, and the corner tile of the far player
+takes that player's colours, even when the other group comes first in the list. A run of shared
+tiles is settled from its ends. On a scaled layer (the far player in Mario's Tennis) "next to" means
+next to it in the game's background map, whatever the zoom.
+
+Where nothing next to the tile says whose it is (a whole word both groups have, or one group's
+tiles on one side and the other's on the other), **the group listed first wins**, and the other's
+paint for that tile never shows. The order is the order of the groups in the project
+(`groups.json`). Only those tiles are the order's to decide, and only they are reported below.
 
 - A group whose tiles take another group's colours on the frame you're on says so on its row:
   **behind Mario-PlayingAs**. That only shows when the group is on screen without the winner — when
@@ -620,7 +630,8 @@ order of the groups in the project (`groups.json`); nothing else decides it.
   with **Put this group first**, and *Ahead of Luigi on 3 tiles* with **Let Luigi win**. Each
   moves one group just above the other in the list. Save to keep the new order.
 - **This pixel** offers the same: *Mario wins because it comes first in the group list* comes with
-  **Let Luigi win**.
+  **Let Luigi win**. Where the neighbours decided, it says so (*Mario wins because its own tiles are
+  next to it*) and offers no reorder: the order does not change that tile.
 - If both groups are on screen at once, no order makes both right: one pattern on one layer takes
   one group's colour. If each turns up alone on different screens, limit one of them to its own
   screens (**Paint shows when…**, in its details) instead of reordering — or, when the game's memory
@@ -751,8 +762,9 @@ its edges. It's the nicest place to paint characters.
   - **Only this group's paint** (on by default; remembered): the group you're painting shows only
     its own paint on its tiles — not colours another group, or the shared pack, gives the same tile
     patterns in the game. So a character never looks half-painted in another character's colours
-    while you work; unpainted tiles look unpainted. Untick it to see what the game shows, where the
-    group listed first (among those allowed on the screen) colours a shared tile.
+    while you work; unpainted tiles look unpainted. Untick it to see what the game shows, where a
+    shared tile takes the colours of the group whose tiles are next to it, or of the group listed
+    first (among those allowed on the screen) where nothing next to it tells.
   - **Base tiles** (scaled groups only, like the far player in Mario's Tennis): shows the group's
     tiles unscaled, as they sit in the game's background map, instead of zoomed by the game.
     Paint them there with any tool; paint is per tile pattern, so every scaled copy on every frame
@@ -793,14 +805,34 @@ its edges. It's the nicest place to paint characters.
     it asks: **Clear this pose only** (the tiles no other pose or card of the group uses; shared
     tiles keep their colour everywhere) or **Clear all, shared tiles too** (the other poses lose
     that paint). It lists which poses share tiles, and Undo brings it all back.
-- **Find poses…** (Pose details, for a background character) looks through the captured frames for
-  the character's poses you have not kept and for poses kept twice. It looks only where the
-  character really is (its layers that are not scaled, on frames where its game-state conditions
-  hold) and leaves out fragments much smaller than its usual pose. New poses come ticked to keep,
-  each from the first frame showing it; duplicates come ticked to remove, keeping the one with a
-  picture or a name you chose — removing one moves its animation steps, and its picture if the
-  other has none, to the one kept. A duplicate you named starts unticked, and one where both have a
-  picture is only listed. Nothing is written until you Save.
+- **Find poses…** (Pose details, for a background character or a sprite group with a pose kept)
+  looks through the captured frames for the character's poses you have not kept and for poses kept
+  twice. For a background character it looks only where the character really is (its layers that
+  are not scaled, on frames where its game-state conditions hold) and leaves out fragments much
+  smaller than its usual pose. For a sprite it looks at every frame's sprites that share the group's
+  tiles; a pose facing the other way (or upside down) is the same pose, so it is not offered again.
+  For a character kept as scaled poses (an opponent drawn through the court's zoom) it only looks
+  for duplicates: two scaled poses with the same patterns. Keep new scaled poses from the filmstrip.
+  New poses come ticked to keep, each from the first frame showing it — except one that also has
+  another sprite group's tiles (the card says whose: usually two sprites touching, sometimes a real
+  pose such as Mario carrying a shell) or one only ever seen cut by the screen's edge. Duplicates
+  come ticked to remove, keeping the one with a picture or a name you chose — removing one moves its
+  animation steps, and its picture if the other has none, to the one kept. A duplicate you named
+  starts unticked, and one where both have a picture is only listed. Nothing is written until you
+  Save.
+- **Find sprites…** (next to *Sprites* in the left rail) is for a game's sprites before you have
+  groups for them — Wario Land straight after capturing it. It looks at every captured frame's
+  sprites, takes out the poses your sprite groups already keep (whichever way they face), and leaves
+  out two sprites that were touching and a sprite cut off by the screen's edge. What is left is
+  grouped into characters by the tiles their poses share: each character is a **New sprite group**
+  (name it in the box) or **Add to** the group it shares tiles with. Untick poses that don't belong
+  and characters that are not sprites (HUD digits, menu icons); one- and two-tile bits are under
+  **Small bits**, unticked. Apply makes the groups and poses; Save keeps them. Groups can be renamed
+  in the Project tool.
+- **Mirrored poses.** A sprite facing the other way is the same pose: SpriteStudio and the Project
+  tool find a pose mirrored (left–right or upside down) when it isn't there as captured. Turn off
+  **Mirror OK** on a pose in the Project tool when its art is not a true mirror image, and its
+  mirrored copy is treated as a pose of its own.
 - **Painting complete** (Pose details, right rail) finishes the card on stage: every pixel still
   unpainted — a tile with no paint, a clear pixel, or a starting grey — keeps the grey it shows as
   paint of its own (the same grey to the eye), so the pose stops counting as unpainted and you don't

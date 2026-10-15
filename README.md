@@ -114,6 +114,11 @@ sythnvtby is built on the work of these projects — thank you to everyone who m
 | **[miniz](https://github.com/richgel999/miniz)**, **[nlohmann/json](https://github.com/nlohmann/json)**, **[stb_image](https://github.com/nothings/stb)** | Native PC player: reading play packs | MIT |
 | **[Outfit](https://fonts.google.com/specimen/Outfit)**, **[IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono)** | Fonts, loaded from Google Fonts | SIL OFL 1.1 |
 
+**Works with [VBoy Color](https://github.com/yuk27/VBoyColor)**, another Virtual Boy colouring
+project (GPL-3.0). The Project tool's File ▸ Import VBoy Color pack reads its `.vbcp` colour packs
+into a project as a head start. No VBoy Color code or packs are included; colours you import are
+theirs, so credit VBoy Color if you share a project or play pack that uses them.
+
 Every component, its licence and where the core's source comes from: [NOTICE](NOTICE).
 
 ## License

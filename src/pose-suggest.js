@@ -53,6 +53,16 @@ export function findNewPoses({ hits, kept, minShare = 0.6 }) {
   return [...found.values()];
 }
 
+/**
+ * A scaled (affine) pose's key: its sorted patterns. It is drawn through the court's zoom, so it
+ * keeps which patterns it shows, not where; marked so it never matches an unscaled layout.
+ * @param {Array<{ hash: number }>} tiles
+ */
+export function scaledPoseKey(tiles) {
+  if (!Array.isArray(tiles) || !tiles.length) return '';
+  return `scaled:${tiles.map((t) => t.hash >>> 0).sort((a, b) => a - b).join(';')}`;
+}
+
 /** A pose name someone chose: not "Pose 12" and not a frame's label ("#353 · InGame – f-…"). */
 const chosenName = (name) => typeof name === 'string' && !!name && !/^Pose \d+$/.test(name) && !/^#\d+ · /.test(name) && !/ – f-[a-z0-9-]+$/.test(name);
 
@@ -60,12 +70,16 @@ const chosenName = (name) => typeof name === 'string' && !!name && !/^Pose \d+$/
  * Kept poses that share a layout. In each set one is kept — the one with a pose picture, else a name
  * someone chose, else one an animation uses, else the first — and the rest can go. A set where more
  * than one pose has a picture is listed but not offered (`safe: false`): removing either would lose
- * a picture. `named` says a pose that would go has a name someone chose (the same art used in two
- * animations, say), so it is better asked about than assumed.
+ * a picture. A scaled (affine) pose keeps only its patterns, not where they sit, so two scaled
+ * poses are the same when they have the same patterns ({@link scaledPoseKey}). `named` says a pose that would go has a name someone chose (the same art used in two
+ * animations, say), so it is better asked about than assumed. `keyOf` says when two poses are the
+ * same layout: as captured by default; a sprite's poses also match their mirror images
+ * (src/sprite-suggest.js keptPoseKey).
  * @param {any} group
+ * @param {{ keyOf?: (pose: any) => string }} [options]
  * @returns {Array<{ keep: string, drop: string[], safe: boolean, named: boolean }>}
  */
-export function findDuplicatePoses(group) {
+export function findDuplicatePoses(group, { keyOf = (p) => poseLayoutKey(p.tiles) } = {}) {
   const poses = Array.isArray(group?.poses) ? group.poses : [];
   const pictured = new Set((Array.isArray(group?.poseOverpaints) ? group.poseOverpaints : []).map((p) => p?.poseId).filter(Boolean));
   const inTracks = new Set();
@@ -74,8 +88,8 @@ export function findDuplicatePoses(group) {
   /** @type {Map<string, any[]>} */
   const byKey = new Map();
   for (const p of poses) {
-    if (p?.affine) continue;
-    const key = poseLayoutKey(p.tiles);
+    if (!p) continue;
+    const key = p.affine ? scaledPoseKey(p.tiles) : keyOf(p);
     if (!key) continue;
     if (!byKey.has(key)) byKey.set(key, []);
     byKey.get(key).push(p);

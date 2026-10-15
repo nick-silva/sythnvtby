@@ -201,6 +201,33 @@ export function sampleAffineWorld(state, world, eye, visit) {
   return true;
 }
 
+/**
+ * The character in each 8 px cell of an affine world's map plane, read the way sampleAffineWorld
+ * reads it (`cell` there is `cellY * 1024 + cellX`): what lies beside a cell on screen at any zoom.
+ * @returns {null | { width: number, height: number, charAt: (cx: number, cy: number) => number }}
+ *   cells across and down; charAt is -1 outside the map. Null when the world is not affine.
+ */
+export function affineMapReader(state, world) {
+  const mem = frameMemory(state);
+  if (!mem || world < 0 || world > 31) return null;
+  const header = mem.rdWin(world * WORLD_BYTES);
+  if (((header >> 12) & 3) !== BGM_AFFINE) return null;
+  const mapBase = (header & 0xf) * 4096;
+  const scy = (header >> 8) & 3;
+  const scx = (header >> 10) & 3;
+  const width = 64 << scx;
+  const height = 64 << scy;
+  return {
+    width,
+    height,
+    charAt(cx, cy) {
+      if (!Number.isInteger(cx) || !Number.isInteger(cy) || cx < 0 || cy < 0 || cx >= width || cy >= height) return -1;
+      const addr = (mapBase | (((cy >> 6) << 12) << scx) | ((cy & 0x3f) << 6) | ((cx >> 6) << 12) | (cx & 0x3f)) & 0xffff;
+      return mem.rdDram(addr) & 0x7ff;
+    },
+  };
+}
+
 /** @typedef {{ char: Int16Array, tx: Uint8Array, ty: Uint8Array, lit: Uint8Array, mx: Int32Array, my: Int32Array }} AffinePixels `mx`/`my`: the map pixel read (-1 where none), as the map lays it out */
 
 /** Per frame object and eye: the tools ask about the same frame many times per pointer move. */

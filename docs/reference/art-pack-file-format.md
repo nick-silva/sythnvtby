@@ -1,7 +1,7 @@
 ---
 status: current
-last-reviewed: 2026-10-13
-covers: src/art-pack.js, src/frame-summary.js, src/group-schema.js, src/group-order.js, src/screen-gate.js, src/game-states.js, src/memory-questions.js, src/recovery.js, src/layer-art.js, src/touch-up.js, src/group-folders.js, src/transparent-paint.js, src/frame-cleanup.js, src/zip-read.js, src/zip-write.js, src/lazy-entries.js
+last-reviewed: 2026-10-14
+covers: src/art-pack.js, src/frame-summary.js, src/group-schema.js, src/group-order.js, src/screen-gate.js, src/game-states.js, src/memory-questions.js, src/recovery.js, src/layer-art.js, src/touch-up.js, src/group-folders.js, src/transparent-paint.js, src/frame-cleanup.js, src/zip-read.js, src/zip-write.js, src/lazy-entries.js, src/pose-mirror.js
 ---
 
 # Art pack file format (.vbpack)
@@ -242,10 +242,11 @@ Used on **`groups[]`** (legacy) and **`gameStatePools[].variants[]`** (v2). Each
 
 **Unknown fields are kept:** every tool reads groups through `src/group-schema.js`, which tidies the fields below and leaves any other field as it is, so a field one tool writes survives a save in another.
 
-**The order of the array is the groups' priority.** Where two groups both claim a draw and both
-have paint for its pattern, the one listed first colours it (`resolveGroupTileMatch`,
-`src/color-layer.js`); the Project tool changes the order with **Let … win** / **Put this group
-first** (`src/group-order.js`). Keep the order when rewriting the file.
+**The order of the array is the groups' priority.** Where two groups both claim a draw and paint
+its pattern differently, the group whose own tiles are next to it colours it
+(`src/shared-tile-owner.js`); where nothing next to it tells, the one listed first does
+(`resolveGroupTileMatch`, `src/color-layer.js`). The Project tool changes the order with **Let …
+win** / **Put this group first** (`src/group-order.js`). Keep the order when rewriting the file.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -403,7 +404,10 @@ by `src/obj-sprite-profiles.js`; design in [obj-sprite-profiles-design.md](../de
   See `src/pose-source-frames.js`.
 - **`tracks[].steps[].holdFrames`** is in VB frames (about 20 ms each); **`flipH`** plays that
   step mirrored. Steps naming a missing pose are dropped on load.
-- **`allowFlipMacro`** is stored but not yet used to match mirrored poses.
+- **`allowFlipMacro`** (default true, *Mirror OK* in the Project tool): the pose is also found
+  drawn mirrored — left–right, upside down or both — when it is not there as captured; the tiles keep
+  their patterns and sit on the other side of the anchor (`src/pose-mirror.js`). `false` means the art
+  is not a true mirror image: its mirrored copy is a pose of its own.
 - **BG groups may keep poses too**: frames picked to paint the group on, made in the Project tool
   (**New pose from selection…** on background or affine tiles) or in SpriteStudio (**Keep as pose**
   on a frame card). A background pose has the same shape as a sprite pose. A pose on a scaled

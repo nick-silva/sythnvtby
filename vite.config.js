@@ -21,6 +21,8 @@ export default defineConfig({
   server: {
     // Allow access from other machines on your LAN (e.g. phone/another PC).
     host: true, // equivalent to 0.0.0.0
+    // Local hostname served by the Caddy reverse proxy (http://sythnvtby; *.localhost is allowed already).
+    allowedHosts: ['sythnvtby'],
     // port: 5173,
     // strictPort: true,
   },

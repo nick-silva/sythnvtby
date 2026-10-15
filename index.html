@@ -82,6 +82,7 @@
         <button type="button" id="btn-auto-capture" disabled aria-pressed="false" title="Play normally; the game pauses on any frame showing a tile no captured frame has yet — background, sprite or scaled (affine), you choose when you turn it on — outlines the new tiles, and asks you to label the capture. Best after a first manual pass. Left eye only.">Auto-capture</button>
         <span id="auto-capture-status" class="auto-capture-status" aria-live="polite" hidden></span>
         <button type="button" id="btn-memory" aria-pressed="false" title="Record the game's memory for a question's side (e.g. “Who is the player?” › Luigi) while you play, and see live which screen and game states hold. Recordings go to the Project tool with Colorize! and Export .vbpack.">Memory</button>
+        <button type="button" id="btn-poses" aria-pressed="false" title="Which characters' saved poses the frame on screen shows, and which pose pictures were drawn (and why one was not). Live while playing; Pause and step to look at one frame. Copy puts the report, with the frame number, on the clipboard.">Poses</button>
         <button type="button" id="btn-pause" disabled aria-pressed="false" title="Pause the game to step through it frame by frame (P). Then Capture Frame or F8 saves exactly the frame on screen.">Pause</button>
         <button type="button" id="btn-step-back" disabled title="Step back one frame (,) — Shift: 10 frames. The emulator keeps the last 3 seconds of frames while it runs.">◂ Step</button>
         <button type="button" id="btn-step-forward" disabled title="Step forward one frame (.) — Shift: 10 frames. Pauses first if the game is running.">Step ▸</button>
@@ -100,6 +101,7 @@
       </div>
     </header>
     <section id="memory-panel" class="memory-panel" hidden aria-label="Memory: recordings and game states"></section>
+    <section id="poses-panel" class="poses-panel" hidden aria-label="Poses on this frame"></section>
     <main class="main">
       <div id="game-container" class="game-container fill">
         <div id="game"></div>

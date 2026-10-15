@@ -8,6 +8,9 @@
 #include "vbcolor/colorizer.hpp"
 
 #include <algorithm>
+#include <array>
+#include <deque>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -103,6 +106,310 @@ struct AffineArtEntry {
   const Group* group = nullptr;
 };
 
+/**
+ * Which group colours a shared tile: the one whose own tiles touch it (src/shared-tile-owner.js,
+ * which explains the rule; this decides exactly what it decides). A tile two allowed groups paint
+ * differently gets votes from the draws beside it (same world and layer, 8 px left/right/up/down;
+ * on an affine world the map cells beside it); touching contested tiles settle together in rounds
+ * that each read only the last one's results; then the corners; one group voted → it wins, else
+ * the list order does. One per eye per frame, lazy: a frame with nothing contested costs nothing.
+ */
+class SharedTileOwners {
+ public:
+  using Entry = std::pair<const Group*, const TileRgba*>;
+  using Colors = std::unordered_map<uint32_t, std::vector<Entry>>;
+  static constexpr int kMaxRounds = 8;        // MAX_ROUNDS
+  static constexpr size_t kMaxCluster = 256;  // MAX_CLUSTER
+
+  SharedTileOwners(const Mem& m, int eye, const std::vector<DrawCall>& draws, const Colors& colors,
+                   const std::unordered_set<uint32_t>& maybe_contested, const std::unordered_set<const Group*>& hidden,
+                   const Twins& twins, const std::vector<int>& affine)
+      : m_(m), eye_(eye), draws_(draws), colors_(colors), maybe_(maybe_contested), hidden_(hidden), twins_(twins) {
+    for (int w : affine) affine_[static_cast<size_t>(w)] = true;
+    slot_code_.fill(0);
+  }
+
+  bool is_contested(uint32_t hash) const { return maybe_.count(hash) > 0; }
+
+  /** ownerOfDraw: the entry the neighbours give draw `i` (a plain or sprite draw); null → list order. */
+  const Entry* owner_of_draw(int i, uint32_t hash) {
+    if (!maybe_.count(hash)) return nullptr;
+    if (!positions_built_) build_positions();
+    const DrawCall& d = draws_[static_cast<size_t>(i)];
+    const std::optional<uint32_t> own = hash_of(d.tile);
+    const uint32_t h = own ? *own : hash;
+    int n = draw_node_[static_cast<size_t>(i)];
+    if (n < 0) {
+      // As the browser: the first draw at this place with this pattern.
+      int at = i;
+      auto it = pos_.find(pos_key(world_of(d), layer_or0(d), d.x, d.y));
+      if (it != pos_.end()) {
+        for (int j : it->second) {
+          if (hash_of(draws_[static_cast<size_t>(j)].tile) == h) {
+            at = j;
+            break;
+          }
+        }
+      }
+      n = node_of_draw(at, h);
+    }
+    return owner_of(n);
+  }
+
+  /** ownerOfCell: the same for map cell `cell` (cellY * 1024 + cellX) of affine world `world`. */
+  const Entry* owner_of_cell(int world, int cell, uint32_t hash) {
+    if (cell < 0 || !maybe_.count(hash)) return nullptr;
+    const int n = node_of_cell(world, cell % 1024, cell / 1024);
+    return n < 0 ? nullptr : owner_of(n);
+  }
+
+ private:
+  struct Node {
+    uint32_t hash = 0;
+    int world = -1, layer = 0, x = 0, y = 0;  // a draw's screen place, or a cell's map cell
+    int match_world = -1, match_layer = -1, tile = 0;
+    bool cell = false;
+    int claim_state = -1;  // -1 not worked out, 0 not contested, 1 contested
+    std::vector<const Entry*> claim;
+  };
+
+  // The sides first (0–3), then the corners (4–7).
+  static constexpr int kDirs[8][2] = {{-8, 0}, {8, 0}, {0, -8}, {0, 8}, {-8, -8}, {8, -8}, {-8, 8}, {8, 8}};
+
+  static long long pos_key(int world, int layer, int x, int y) {
+    return ((((static_cast<long long>(world + 1) & 63) * 4 + (layer & 3)) * 2048 + ((x + 1024) & 2047)) * 2048) + ((y + 1024) & 2047);
+  }
+
+  std::optional<uint32_t> hash_of(int tile) {
+    const int slot = tile & 2047;
+    int& c = slot_code_[static_cast<size_t>(slot)];
+    if (!c) {
+      const uint8_t* b = m_.tile(slot);
+      if (is_blank(b)) {
+        c = 1;
+      } else {
+        hashes_.push_back(hash_tile(b));
+        c = static_cast<int>(hashes_.size()) + 1;
+      }
+    }
+    if (c == 1) return std::nullopt;
+    return hashes_[static_cast<size_t>(c - 2)];
+  }
+
+  int match_world_of(int world) const { return world >= 0 && twins_.has(world) ? twins_.left[static_cast<size_t>(world)] : world; }
+
+  void build_positions() {
+    positions_built_ = true;
+    draw_node_.assign(draws_.size(), -1);
+    for (int i = 0; i < static_cast<int>(draws_.size()); i++) {
+      const DrawCall& d = draws_[static_cast<size_t>(i)];
+      if (d.eye != eye_) continue;
+      if (layer_of(d) == 1 && world_of(d) >= 0 && affine_[static_cast<size_t>(world_of(d))]) continue;
+      if (!hash_of(d.tile)) continue;
+      pos_[pos_key(world_of(d), layer_or0(d), d.x, d.y)].push_back(i);
+    }
+  }
+
+  int node_of_draw(int i, uint32_t hash) {
+    if (draw_node_[static_cast<size_t>(i)] >= 0) return draw_node_[static_cast<size_t>(i)];
+    const DrawCall& d = draws_[static_cast<size_t>(i)];
+    Node n;
+    n.hash = hash;
+    n.world = world_of(d);
+    n.layer = layer_or0(d);
+    n.x = d.x;
+    n.y = d.y;
+    n.match_world = match_world_of(world_of(d));
+    n.match_layer = layer_of(d);
+    n.tile = d.tile;
+    nodes_.push_back(std::move(n));
+    draw_node_[static_cast<size_t>(i)] = static_cast<int>(nodes_.size()) - 1;
+    return draw_node_[static_cast<size_t>(i)];
+  }
+
+  int node_of_cell(int world, int cx, int cy) {
+    if (cx < 0 || cy < 0) return -1;
+    const long long key = (static_cast<long long>(world) << 42) | (static_cast<long long>(cy) << 21) | cx;
+    auto it = cell_node_.find(key);
+    if (it != cell_node_.end()) return it->second;
+    const int ch = affine_map_char(m_, world, cx, cy);
+    const std::optional<uint32_t> h = ch < 0 ? std::nullopt : hash_of(ch);
+    int id = -1;
+    if (h) {
+      Node n;
+      n.hash = *h;
+      n.world = world;
+      n.layer = 1;
+      n.x = cx;
+      n.y = cy;
+      n.match_world = match_world_of(world);
+      n.match_layer = 1;
+      n.tile = ch;
+      n.cell = true;
+      nodes_.push_back(std::move(n));
+      id = static_cast<int>(nodes_.size()) - 1;
+    }
+    cell_node_.emplace(key, id);
+    return id;
+  }
+
+  /** Neighbour nodes in directions [from, to) of kDirs. */
+  std::vector<int> neighbours(int id, int from, int to) {
+    std::vector<int> out;
+    for (int k = from; k < to; k++) {
+      const Node& n = nodes_[static_cast<size_t>(id)];  // nodes_ is a deque: adding nodes keeps it valid
+      if (n.cell) {
+        const int c = node_of_cell(n.world, n.x + kDirs[k][0] / 8, n.y + kDirs[k][1] / 8);
+        if (c >= 0) out.push_back(c);
+      } else {
+        auto it = pos_.find(pos_key(n.world, n.layer, n.x + kDirs[k][0], n.y + kDirs[k][1]));
+        if (it == pos_.end()) continue;
+        for (int j : it->second) out.push_back(node_of_draw(j, *hash_of(draws_[static_cast<size_t>(j)].tile)));
+      }
+    }
+    return out;
+  }
+
+  /** claimOf: whether two or more allowed groups claim the node and paint it differently. */
+  bool contested(int id) {
+    Node& n = nodes_[static_cast<size_t>(id)];
+    if (n.claim_state >= 0) return n.claim_state == 1;
+    n.claim_state = 0;
+    if (!maybe_.count(n.hash)) return false;
+    auto it = colors_.find(n.hash);
+    if (it == colors_.end()) return false;
+    std::vector<const Entry*> claim;
+    for (const Entry& e : it->second) {
+      if (!hidden_.count(e.first) && matches_group(n.match_world, n.match_layer, n.tile, *e.first, n.hash)) claim.push_back(&e);
+    }
+    const bool differ = claim.size() > 1 && std::any_of(claim.begin() + 1, claim.end(), [&](const Entry* e) { return *e->second != *claim[0]->second; });
+    if (!differ) return false;
+    n.claim = std::move(claim);
+    n.claim_state = 1;
+    return true;
+  }
+
+  /** Stands for "neighbours disagree" among vote results (never a real group). */
+  static const Group* conflict() {
+    static const Group marker{};
+    return &marker;
+  }
+
+  /** The group the neighbours in directions [from, to) agree on, conflict(), or null when none votes. */
+  const Group* vote(int id, int from, int to, const std::unordered_map<int, const Group*>& owner) {
+    std::vector<const Group*> votes;
+    const auto add = [&](const Group* g) {
+      if (std::find(votes.begin(), votes.end(), g) == votes.end()) votes.push_back(g);
+    };
+    const std::vector<const Entry*>& claim = nodes_[static_cast<size_t>(id)].claim;
+    for (int nb : neighbours(id, from, to)) {
+      const Node& b = nodes_[static_cast<size_t>(nb)];
+      const Group* only = nullptr;
+      int mine = 0;
+      for (const Entry* e : claim) {
+        if (matches_group(b.match_world, b.match_layer, b.tile, *e->first, b.hash)) {
+          mine++;
+          only = e->first;
+        }
+      }
+      if (mine == 1) {
+        add(only);
+      } else if (mine > 1) {
+        auto o = owner.find(nb);
+        if (o != owner.end() && std::any_of(claim.begin(), claim.end(), [&](const Entry* e) { return e->first == o->second; })) add(o->second);
+      }
+    }
+    if (votes.size() == 1) return votes[0];
+    return votes.empty() ? nullptr : conflict();
+  }
+
+  void settle(int start) {
+    std::vector<int> cluster{start};
+    std::unordered_set<int> seen{start};
+    bool big = false;
+    for (size_t i = 0; i < cluster.size() && !big; i++) {
+      for (int nb : neighbours(cluster[i], 0, 8)) {
+        if (seen.count(nb) || !contested(nb)) continue;
+        if (seen.size() >= kMaxCluster) {
+          big = true;
+          break;
+        }
+        seen.insert(nb);
+        cluster.push_back(nb);
+      }
+    }
+    if (big) {
+      for (int n : cluster) settled_[n] = nullptr;
+      return;
+    }
+    std::unordered_map<int, const Group*> owner;
+    std::unordered_set<int> conflicted;
+    for (int round = 0; round < kMaxRounds; round++) {
+      std::unordered_map<int, const Group*> next = owner;
+      bool changed = false;
+      for (int n : cluster) {
+        if (owner.count(n)) continue;
+        const Group* g = vote(n, 0, 4, owner);
+        if (g == conflict()) {
+          conflicted.insert(n);
+        } else if (g) {
+          conflicted.erase(n);
+          next[n] = g;
+          changed = true;
+        }
+      }
+      owner = std::move(next);
+      if (!changed) break;
+    }
+    std::unordered_map<int, const Group*> final_owner = owner;
+    for (int n : cluster) {
+      if (owner.count(n) || conflicted.count(n)) continue;
+      const Group* g = vote(n, 4, 8, owner);
+      if (g && g != conflict()) final_owner[n] = g;
+    }
+    for (int n : cluster) {
+      const Entry* entry = nullptr;
+      auto f = final_owner.find(n);
+      if (f != final_owner.end()) {
+        for (const Entry* e : nodes_[static_cast<size_t>(n)].claim) {
+          if (e->first == f->second) {
+            entry = e;
+            break;
+          }
+        }
+      }
+      settled_[n] = entry;
+    }
+  }
+
+  const Entry* owner_of(int id) {
+    if (!contested(id)) return nullptr;
+    auto it = settled_.find(id);
+    if (it == settled_.end()) {
+      settle(id);
+      it = settled_.find(id);
+    }
+    return it->second;
+  }
+
+  const Mem& m_;
+  int eye_;
+  const std::vector<DrawCall>& draws_;
+  const Colors& colors_;
+  const std::unordered_set<uint32_t>& maybe_;
+  const std::unordered_set<const Group*>& hidden_;
+  const Twins& twins_;
+  std::array<bool, 32> affine_{};
+  std::array<int, 2048> slot_code_{};
+  std::vector<uint32_t> hashes_;
+  bool positions_built_ = false;
+  std::unordered_map<long long, std::vector<int>> pos_;
+  std::vector<int> draw_node_;
+  std::unordered_map<long long, int> cell_node_;
+  std::deque<Node> nodes_;
+  std::unordered_map<int, const Entry*> settled_;
+};
+
 /** Map cells an affine world reads, in the order first read, with their pattern hashes. */
 struct Cells {
   std::vector<std::pair<int, uint32_t>> ordered;
@@ -176,6 +483,8 @@ struct Colorizer::Impl {
   /** pattern → groups painting it, in group order (buildGroupTileColorIndex). */
   std::unordered_map<uint32_t, std::vector<std::pair<const Group*, const TileRgba*>>> group_colors;
   std::vector<const Group*> animated;
+  /** Patterns two or more groups paint differently: the only ones SharedTileOwners can decide. */
+  std::unordered_set<uint32_t> maybe_contested;
   std::unordered_map<const Group*, std::unordered_map<uint32_t, std::optional<TileRgba>>> ramp_cache;
   uint32_t blank_hash = 0;
   /** Groups limited to screens the current memory is not (src/screen-gate.js); usually empty. */
@@ -279,6 +588,7 @@ struct Colorizer::Impl {
     // Each pattern's groups in group order: the vector's order is its addresses' order.
     for (auto& [hash, list] : group_colors) {
       std::stable_sort(list.begin(), list.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+      if (list.size() > 1 && std::any_of(list.begin() + 1, list.end(), [&](const auto& e) { return *e.second != *list[0].second; })) maybe_contested.insert(hash);
     }
     const uint8_t zeros[16] = {};
     blank_hash = hash_tile(zeros);
@@ -759,6 +1069,8 @@ struct Colorizer::Impl {
     const std::vector<int> affine_set = affine_worlds(m, eye);
     std::array<bool, 32> is_affine{};
     for (int w : affine_set) is_affine[static_cast<size_t>(w)] = true;
+    // A tile two groups paint differently goes to the group whose own tiles touch it.
+    SharedTileOwners owners(m, eye, draws, group_colors, maybe_contested, screen_hidden, twins, affine_set);
 
     // ---------------------------------------------------- borrowing from the left eye
     std::vector<uint8_t> right_codes;
@@ -851,6 +1163,8 @@ struct Colorizer::Impl {
 
     auto paint_affine = [&](int world) {
       std::unordered_map<int, const TileRgba*> by_char;
+      std::unordered_map<int, const TileRgba*> by_cell;
+      std::unordered_map<int, std::optional<uint32_t>> contested_char;
       const int match_world = twins.has(world) ? twins.left[static_cast<size_t>(world)] : world;
       auto colour_of = [&](int ch) -> const TileRgba* {
         auto it = by_char.find(ch);
@@ -863,9 +1177,25 @@ struct Colorizer::Impl {
         by_char.emplace(ch, rgba);
         return rgba;
       };
+      // A character two groups paint differently is decided per map cell, by the cells beside it.
+      auto colour_at = [&](int ch, int cell) -> const TileRgba* {
+        if (cell < 0) return colour_of(ch);
+        auto c = contested_char.find(ch);
+        if (c == contested_char.end()) {
+          const uint32_t h = hash_tile(m.tile(ch));
+          c = contested_char.emplace(ch, owners.is_contested(h) ? std::optional<uint32_t>(h) : std::nullopt).first;
+        }
+        if (!c->second) return colour_of(ch);
+        auto it = by_cell.find(cell);
+        if (it != by_cell.end()) return it->second;
+        const auto* owner = owners.owner_of_cell(world, cell, *c->second);
+        const TileRgba* rgba = owner ? owner->second : colour_of(ch);
+        by_cell.emplace(cell, rgba);
+        return rgba;
+      };
       const bool all_from_left = borrows_all(world);
-      sample_affine_world(m, world, eye, [&](int x, int y, int ch, int tx, int ty, int px, int pal, bool, bool, bool, int) {
-        const TileRgba* rgba = colour_of(ch);
+      sample_affine_world(m, world, eye, [&](int x, int y, int ch, int tx, int ty, int px, int pal, bool, bool, bool, int cell) {
+        const TileRgba* rgba = colour_at(ch, cell);
         if (px == 0 && !(transparent_paint && rgba && (*rgba)[static_cast<size_t>((ty * 8 + tx) * 4 + 3)])) return;
         const int pidx = y * kW + x;
         pix_world[pidx] = static_cast<int8_t>(world);
@@ -946,7 +1276,8 @@ struct Colorizer::Impl {
       const int twin_left = world >= 0 && twins.has(world) ? twins.left[static_cast<size_t>(world)] : -1;
       const int match_world = twin_left >= 0 ? twin_left : world;
       const bool all_from_left = twin_left >= 0 && borrows_all(world);
-      const auto* match = group_match(match_world, layer, c.tile, hash);
+      const auto* match = owners.owner_of_draw(i, hash);
+      if (!match) match = group_match(match_world, layer, c.tile, hash);
       const TileRgba* rgba = match ? match->second : nullptr;
       const std::array<double, 16>* follow = nullptr;
       if (match && any_follow && match->first->follow_palette && layer_or0(c) == 0 && world >= 0 && follow_factors[static_cast<size_t>(world)]) {

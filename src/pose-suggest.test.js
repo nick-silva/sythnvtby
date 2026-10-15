@@ -76,6 +76,19 @@ describe('findDuplicatePoses and mergeDuplicatePose', () => {
     expect(findDuplicatePoses(twoPictures)[0].safe).toBe(false);
   });
 
+  it('finds scaled poses with the same patterns, whatever their order', () => {
+    const scaled = {
+      poses: [
+        { poseId: 'a', name: 'Pose 1', affine: true, tiles: [{ hash: 1 }, { hash: 2 }, { hash: 3 }] },
+        { poseId: 'b', name: 'Serve', affine: true, tiles: [{ hash: 3 }, { hash: 1 }, { hash: 2 }] },
+        { poseId: 'c', name: 'Pose 3', affine: true, tiles: [{ hash: 1 }, { hash: 2 }] },
+        // An unscaled pose with the same patterns at its own places is not a scaled pose's twin.
+        { poseId: 'd', name: 'Pose 4', tiles: [{ hash: 1, dx: 0, dy: 0 }, { hash: 2, dx: 8, dy: 0 }, { hash: 3, dx: 16, dy: 0 }] },
+      ],
+    };
+    expect(findDuplicatePoses(scaled)).toEqual([{ keep: 'b', drop: ['a'], safe: true, named: false }]);
+  });
+
   it('folds a duplicate into its twin: animations and its picture move, the pose goes', () => {
     const g = { ...group, poseOverpaints: [{ id: 'p1', poseId: 'pose_3' }] };
     const merged = mergeDuplicatePose(mergeDuplicatePose(g, 'pose_1', 'pose_2'), 'pose_3', 'pose_2');

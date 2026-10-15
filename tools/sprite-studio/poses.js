@@ -7,11 +7,13 @@
 import { frameState, frameIndexForFrameId, posesOf, locatePose, poseBounds, bgGroupViews, bgGroupFrameHits, frameWram, affinePoseView, affineBaseView, frameLabel, liveGroupTileColors } from '../shared/pack-session.js';
 import { heldProjectGameStates, projectConditionsAllow } from '../../src/game-states.js';
 import { findNewPoses, findDuplicatePoses, mergeDuplicatePose } from '../../src/pose-suggest.js';
+import { keptPoseKey, suggestSprites } from '../../src/sprite-suggest.js';
+import { objTilesByHash } from '../../src/auto-capture.js';
 import { getTileBytes, hashTile } from '../../src/vip-state.js';
 import { findRepeatSet } from '../../src/pattern-set.js';
 import { shadeRampFromPaint } from '../../src/shade-ramp.js';
 import { animationPhases, patternBytesFinder } from '../shared/animated-tiles.js';
-import { isObjGroup, removePoseFromGroup, patternsInNoPose, patternsOnlyInPose, withoutPatterns, unclaimedPatterns, poseMoveTargets, movePoseBetweenGroups, updatePose, addPoseToGroup, buildPoseFromView, nextPoseId, LEGACY_POSE_ID } from '../../src/obj-sprite-profiles.js';
+import { isObjGroup, removePoseFromGroup, patternsInNoPose, patternsOnlyInPose, withoutPatterns, unclaimedPatterns, poseMoveTargets, movePoseBetweenGroups, updatePose, addPoseToGroup, buildPoseFromView, buildPoseFromCapture, chooseAnchorIndex, nextPoseId, LEGACY_POSE_ID } from '../../src/obj-sprite-profiles.js';
 import { layerArtOf } from '../../src/layer-art.js';
 import { artTarget, overpaintMode, posePictureCanStart, posePictureForView, resetPaintOn, selectedArt, syncPaintOnUi } from './overpaint.js';
 import { markActiveRow, renderSpriteLists } from './group-list.js';
@@ -67,7 +69,7 @@ function locatedPoseView(pose) {
   if (frameIndex >= 0) {
     const hit = locatePose(frameState(ctx.session, frameIndex), pose, ctx.eye());
     if (hit) {
-      origin = { x: hit.x, y: hit.y };
+      origin = { x: hit.x, y: hit.y, mirrorH: hit.mirrorH, mirrorV: hit.mirrorV };
       matched = hit.matched;
     }
   }
@@ -78,7 +80,7 @@ function locatedPoseView(pose) {
       const hit = locatePose(frameState(ctx.session, i), pose, ctx.eye());
       if (hit && hit.matched > matched) {
         frameIndex = i;
-        origin = { x: hit.x, y: hit.y };
+        origin = { x: hit.x, y: hit.y, mirrorH: hit.mirrorH, mirrorV: hit.mirrorV };
         matched = hit.matched;
         if (matched === pose.tiles.length) break;
       }
@@ -239,6 +241,10 @@ export function keepFrameAsPose(view) {
  * @returns {{ frames: number, fresh: Array<{ key: string, tiles: number, frames: number[], view: any }>, duplicates: Array<{ keep: string, drop: string[], safe: boolean }> }}
  */
 export function poseSuggestions(group) {
+  if (isObjGroup(group)) return spritePoseSuggestions(group);
+  // A character kept as scaled poses (an opponent drawn through the court's zoom) shows on its
+  // unscaled layers only as stray tiles sharing its patterns: offer only its duplicates.
+  if (posesOf(group).some((p) => p.affine)) return { frames: 0, scaled: true, fresh: [], duplicates: findDuplicatePoses(group) };
   const eye = ctx.eye();
   // Frames where its conditions hold, checked from memory before any frame is decoded.
   const playing = (i) => {
@@ -264,6 +270,55 @@ export function poseSuggestions(group) {
   };
 }
 
+/** Every captured frame's sprite (OBJ) tiles on this eye, for sprite suggestions. */
+function spriteFrames() {
+  const eye = ctx.eye();
+  return ctx.session.frames.map((_, frameIndex) => {
+    const draws = [];
+    for (const [hash, ds] of objTilesByHash(frameState(ctx.session, frameIndex), eye)) {
+      for (const d of ds) draws.push({ hash, x: d.x, y: d.y, flipH: !!d.flipH, flipV: !!d.flipV, world: d.world });
+    }
+    return { frameIndex, draws };
+  });
+}
+
+/** The sprites the captured frames show that no sprite group keeps yet (src/sprite-suggest.js). */
+export function spriteSuggestions() {
+  return suggestSprites({ frames: spriteFrames(), groups: ctx.session.groups.filter(isObjGroup) });
+}
+
+/**
+ * A suggested sprite pose as a card: the pose built from the frame it was seen whole on, anchored
+ * like a pose captured in the Project tool. `captured` is what Keep stores; `worlds` its worlds.
+ * @param {import('../../src/sprite-suggest.js').SuggestedPose} suggested @param {number} n
+ */
+export function suggestedPoseView(suggested, n) {
+  const { frameIndex, draws } = suggested.sample;
+  const sourceFrameId = frameIdForIndex(frameIndex);
+  const anchorIndex = chooseAnchorIndex(draws, 0);
+  const pose = buildPoseFromCapture({ poseId: `__suggest:${n}`, name: `Suggestion ${n + 1}`, draws, anchorIndex, ...(sourceFrameId && { sourceFrameId }) });
+  if (!pose) return null;
+  const anchor = draws[anchorIndex];
+  const worlds = [...new Set(draws.map((d) => d.world).filter(Number.isInteger))].sort((a, b) => a - b);
+  return { pose, frameIndex, origin: { x: anchor.x, y: anchor.y }, matched: draws.length, total: draws.length, captured: pose, worlds };
+}
+
+/**
+ * Find poses for a sprite group: the sprites on the captured frames that share its patterns and
+ * that it does not keep (a mirror image counts as kept), and kept poses that are mirror images or
+ * copies of one another. One touching another group's tiles is offered unticked.
+ */
+function spritePoseSuggestions(group) {
+  const mine = spriteSuggestions().characters.find((c) => c.groupId === group.id);
+  const fresh = (mine?.poses || [])
+    .map((p, n) => {
+      const view = suggestedPoseView(p, n);
+      return view && { key: p.key, tiles: p.size, frames: p.frames, view, mixed: p.mixed, others: p.others, clipped: p.clipped };
+    })
+    .filter(Boolean);
+  return { frames: ctx.session.frames.length, fresh, duplicates: findDuplicatePoses(group, { keyOf: keptPoseKey }) };
+}
+
 /**
  * Keep these frame views as poses and fold these duplicates into their twins, as one change.
  * @param {any[]} views from poseSuggestions().fresh @param {Array<{ keep: string, drop: string }>} merges
@@ -276,9 +331,12 @@ export function applyPoseSuggestions(views, merges) {
   for (const view of views) {
     const sourceFrameId = frameIdForIndex(view.frameIndex);
     const name = ctx.session.frames[view.frameIndex]?.label || `Frame ${view.frameIndex + 1}`;
-    const pose = buildPoseFromView({ poseId: nextPoseId(group), name, view, ...(sourceFrameId && { sourceFrameId }) });
+    // A suggested sprite pose was built as a capture is; a background view is kept from the view.
+    const pose = view.captured
+      ? { ...view.captured, poseId: nextPoseId(group), name: `Pose ${posesOf(group).length + 1}` }
+      : buildPoseFromView({ poseId: nextPoseId(group), name, view, ...(sourceFrameId && { sourceFrameId }) });
     if (!pose) continue;
-    group = addPoseToGroup(group, pose);
+    group = addPoseToGroup(group, pose, { windowIds: view.worlds || [] });
     kept++;
   }
   let removed = 0;
@@ -527,7 +585,10 @@ function movePoseToGroup(poseId, toId) {
 
 /** The Move to… picker: groups this pose can go to. */
 export function poseMovePicker(pose) {
-  const targets = poseMoveTargets(ctx.session.groups, ctx.selectedGroup.id, pose.poseId);
+  // Alphabetical for finding one; the groups' own order (earlier wins) is left as it is.
+  const nameOf = (g) => g.name || g.id;
+  const targets = poseMoveTargets(ctx.session.groups, ctx.selectedGroup.id, pose.poseId)
+    .sort((a, b) => nameOf(a).localeCompare(nameOf(b), undefined, { numeric: true, sensitivity: 'base' }));
   const label = document.createElement('label');
   label.className = 'folder-picker';
   label.textContent = 'Move to ';
@@ -542,7 +603,7 @@ export function poseMovePicker(pose) {
     o.textContent = text;
     return o;
   };
-  select.append(opt('', targets.length ? 'group…' : 'no compatible group'), ...targets.map((g) => opt(g.id, g.name || g.id)));
+  select.append(opt('', targets.length ? 'group…' : 'no compatible group'), ...targets.map((g) => opt(g.id, nameOf(g))));
   select.disabled = !targets.length;
   select.addEventListener('change', () => {
     const id = select.value;

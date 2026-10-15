@@ -23,6 +23,7 @@ import { affineOverpaints, paintAffineOverpaint } from './overpaint.js';
 import { groupsForScreen } from './screen-gate.js';
 import { parsePainterV2VipOverlaysJson, blendPainterV2VipOverlaysIntoImageData } from './painter-v2-vip-overlay.js';
 import { decodeGroupTileColors } from './group-tile-colors.js';
+import { createTileOwners } from './shared-tile-owner.js';
 import { fadeFactor, FADE_RESPONSE_DEFAULT } from './fade.js';
 // project.js imports this module too; colourOptions is only called while drawing, after both load.
 import { colourOptions } from './project.js';
@@ -72,6 +73,18 @@ let _pixArtScratch = /** @type {Uint8Array | null} */ (null);
  */
 let _pixBareScratch = /** @type {Uint8Array | null} */ (null);
 let _pixCharScratch = /** @type {Int16Array | null} */ (null);
+/**
+ * Ids of the pictures each eye's last composite drew: a group's overpaint by its group id, a pose
+ * picture by its posePictureKey (the emulator's Poses panel, src/frame-poses.js). Recorded only.
+ * @type {[Set<string>, Set<string>]}
+ */
+const _drawnPictures = [new Set(), new Set()];
+
+/** @param {number} [eye] @returns {Set<string>} the pictures that eye's last composite drew */
+export function getDrawnPictures(eye = 0) {
+  return _drawnPictures[eye === 1 ? 1 : 0];
+}
+
 /** Worlds that had a touch-up drawn on them, last composite. */
 let _touchedWorlds = /** @type {Set<number>} */ (new Set());
 /** Flag in a pixel's shade: no paint coloured it. */
@@ -578,6 +591,31 @@ export function resolveGroupTileMatch(index, draw, hash) {
 }
 
 /**
+ * The neighbour rule for a frame's shared tiles (src/shared-tile-owner.js), with this module's
+ * group matching. For the tools, which ask about one draw at a time.
+ * @param {any} state @param {ReturnType<typeof buildGroupTileColorIndex>} index @param {number} [eye]
+ * @param {(world: number) => number} [matchWorld] a right-eye twin's world → the left one's
+ */
+export function frameTileOwners(state, index, eye = 0, matchWorld) {
+  return createTileOwners({ state, eye, index, matches: drawMatchesGroup, ...(matchWorld ? { matchWorld } : {}) });
+}
+
+/**
+ * The group that colours this draw: its neighbours' choice where two groups paint it differently
+ * (src/shared-tile-owner.js), else the first in the list that claims it.
+ * @param {ReturnType<typeof frameTileOwners> | null} owners
+ * @param {ReturnType<typeof buildGroupTileColorIndex>} index
+ * @param {any} draw the draw as it sits in the frame (for its neighbours)
+ * @param {any} matchDraw the draw as groups match it (a right-eye twin's world as the left one's)
+ * @param {number} hash
+ * @returns {{ group: Group, rgba: Uint8Array, byNeighbours?: true } | null}
+ */
+export function resolveTileOwner(owners, index, draw, matchDraw, hash) {
+  const settled = owners?.ownerOfDraw(draw, hash);
+  return settled ? { ...settled, byNeighbours: true } : resolveGroupTileMatch(index, matchDraw, hash);
+}
+
+/**
  * Brightness factors for groups that follow the game's palette (`group.followPalette`), per world:
  * a Float64Array indexed `palette * 4 + pixelValue`. A pixel's paint is scaled by the shade the
  * game gives it under the palette its tile is drawn with, over the brightest shade that pixel value
@@ -940,6 +978,11 @@ export function compositeColorFrame(state, packEntries, imageData, options = {})
   const twins = eye === 1 && windowsTable ? stereoTwins(windowsTable) : null;
   const twinOf = twins && twins.size ? twins : null;
   const borrow = twinOf && stereoSource ? stereoSource : null;
+  // A tile two groups paint differently goes to the group whose own tiles touch it
+  // (src/shared-tile-owner.js); the list order only where the neighbours do not say.
+  const tileOwners = _frameGroupTileColors
+    ? createTileOwners({ state, eye, index: _frameGroupTileColors, matches: drawMatchesGroup, drawList, matchWorld: (w) => twinOf?.get(w)?.left ?? w })
+    : null;
   /**
    * Each right-eye pixel of a twin world: its shade, 4 where see-through, 0xff where no twin draws.
    * What borrowFrom compares with the left eye's shades; built on first use.
@@ -1050,7 +1093,8 @@ export function compositeColorFrame(state, packEntries, imageData, options = {})
   // (old layer art) the picture replaces the tiles: those draws are skipped below.
   const artState = { patternTable: state.patternTable, windows: windowsTable, drawList };
   const layerArts = activeLayerArts(artState, groups, eye, overrideGroups);
-  const hiding = layerArts.filter((a) => a.art.hideTiles);
+  _drawnPictures[eye === 1 ? 1 : 0] = new Set(layerArts.map((a) => a.group.id));
+  const hiding =layerArts.filter((a) => a.art.hideTiles);
   const replacedWorlds = hiding.length ? new Set(hiding.map((a) => a.world)) : null;
   const isReplaced = (call) => !!replacedWorlds && (call.layer ?? 0) === 0 && replacedWorlds.has(call.world);
   // How much the game's fade dims colour on this frame (src/fade.js): paint, art and fallback alike.
@@ -1080,11 +1124,32 @@ export function compositeColorFrame(state, packEntries, imageData, options = {})
       byChar.set(ch, rgba);
       return rgba;
     };
+    // A character two groups paint differently is decided per map cell, by the cells beside it.
+    /** @type {Map<number, Uint8Array | null>} */
+    const byCell = new Map();
+    /** @type {Map<number, number | null>} character → its pattern when contested, else null */
+    const contestedChar = new Map();
+    const colourAt = (ch, cell) => {
+      if (!tileOwners || cell < 0) return colourOf(ch);
+      let hash = contestedChar.get(ch);
+      if (hash === undefined) {
+        const h = ch < 2048 && _tileHashValid[ch] ? _tileHashVal[ch] : hashTile(getTileBytes(pt, ch)) >>> 0;
+        hash = tileOwners.isContested(h) ? h : null;
+        contestedChar.set(ch, hash);
+      }
+      if (hash === null) return colourOf(ch);
+      let rgba = byCell.get(cell);
+      if (rgba === undefined) {
+        rgba = tileOwners.ownerOfCell(world, cell, hash)?.rgba ?? colourOf(ch);
+        byCell.set(cell, rgba);
+      }
+      return rgba;
+    };
     const owner = drawList.findIndex((d) => d.layer === 1 && d.world === world && (d.eye ?? 0) === eye);
     const k = artBrightness;
     const allFromLeft = borrowsAll(world);
-    sampleAffineWorld(state, world, eye, (x, y, ch, tx, ty, px, pal) => {
-      const rgba = colourOf(ch);
+    sampleAffineWorld(state, world, eye, (x, y, ch, tx, ty, px, pal, _hf, _vf, _rot, cell) => {
+      const rgba = colourAt(ch, cell);
       // Transparent texels stay see-through unless painted and transparent paint is wanted.
       if (px === 0 && !(drawTransparentPaint && rgba && rgba[(ty * 8 + tx) * 4 + 3])) return;
       const pidx = y * W + x;
@@ -1246,7 +1311,7 @@ export function compositeColorFrame(state, packEntries, imageData, options = {})
     /** @type {Float64Array | null} brightness by palette and pixel value, for a palette-following group */
     let followT = null;
     if (!rgba) {
-      const match = resolveGroupTileMatch(_frameGroupTileColors, matchCall, hash);
+      const match = tileOwners?.ownerOfDraw(call, hash) || resolveGroupTileMatch(_frameGroupTileColors, matchCall, hash);
       if (match) {
         rgba = match.rgba;
         if (_paletteFollow && match.group.followPalette === true && (call.layer ?? 0) === 0) followT = _paletteFollow.get(call.world) || null;
@@ -1458,6 +1523,8 @@ export function wireColorLayer(colorCanvas, getDisplayMode, getViewMode, getBrig
   let stereoOutImageData = /** @type {ImageData | null} */ (null);
   let stereoOutW = 0;
   let stereoOutH = 0;
+  /** The last frame coloured: its state, memory, the groups and the left eye's pictures drawn. */
+  let lastFrame = /** @type {{ state: any, wram: Uint8Array | null, groups: Group[], gameStatePools: unknown[], drawn: Set<string> } | null} */ (null);
 
   const onState = (state) => {
     if (getDisplayMode() !== 'color' || !pack) return;
@@ -1480,6 +1547,8 @@ export function wireColorLayer(colorCanvas, getDisplayMode, getViewMode, getBrig
     const project = { overrides, groups, gameStatePools, painterV2Rules, paintsTransparent: drawTransparentPaint };
     const live = { brightnessScale, stripClip, objXOffset, applyOffsetToAllDraws, bgXOffset, deduplicateDraws, wram, unpackedMode, sortDrawsByWorld, painterV2VariantId: v2Variant };
     compositeColorFrame(state, pack.entries, leftData, colourOptions(project, 'play', { ...live, eye: 0 }));
+    // What this frame drew, for the Poses panel (src/frame-poses.js): read after the left composite.
+    lastFrame = { state, wram, groups, gameStatePools, drawn: new Set(getDrawnPictures(0)) };
     // Same brightnessScale the composite used, so anchored paint fades with the scene, and the
     // owner buffer it just filled, so an overlay stops at whatever is drawn in front of it.
     blendPainterV2VipOverlaysIntoImageData(
@@ -1535,6 +1604,8 @@ export function wireColorLayer(colorCanvas, getDisplayMode, getViewMode, getBrig
 
   return {
     onState,
+    /** The last frame coloured, or null before one (Color off, no pack). */
+    lastFrame: () => lastFrame,
     /** @param {boolean} on the pack's transparent-pixel paint is intentional (src/transparent-paint.js) */
     setDrawTransparentPaint(on) {
       drawTransparentPaint = !!on;

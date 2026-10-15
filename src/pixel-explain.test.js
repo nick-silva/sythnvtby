@@ -86,7 +86,7 @@ describe('explainPixel', () => {
   it('says which group wins a shared tile, and why', () => {
     const e = explain({ groups: [group('Mario', {}, RED), group('Luigi', {}, BLUE)] });
     expect(e.sentence).toContain('Mario');
-    expect(e.why[0]).toBe('Luigi also paints this tile here; Mario wins because it comes first in the group list.');
+    expect(e.why[0]).toBe('Luigi also paints this tile here; Mario wins because it comes first in the group list (nothing next to the tile shows whose it is).');
     expect(e.reorder).toEqual({ kind: 'move-before', groupId: 'Luigi', beforeId: 'Mario', label: 'Let Luigi win' });
     expect(explain({ groups: [group('Mario', {}, RED)] }).reorder).toBeUndefined();
   });

@@ -683,6 +683,14 @@ body {
 /* Memory panel (src/memory-panel.js): recording for questions, and game states live. */
 .memory-panel { display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border, #333); font-size: 0.8rem; }
 .memory-panel[hidden] { display: none; }
+.poses-panel { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border, #333); font-size: 0.8rem; }
+.poses-panel[hidden] { display: none; }
+.poses-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.poses-note { color: var(--muted); font-size: 0.75rem; }
+.poses-list { display: flex; flex-direction: column; gap: 0.15rem; max-height: 14rem; overflow-y: auto; font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.74rem; line-height: 1.4; user-select: text; }
+.poses-frame { color: var(--muted); }
+.poses-character { color: var(--text); margin-top: 0.25rem; }
+.poses-pose { color: var(--muted); padding-left: 1.2rem; }
 .memory-controls, .memory-live { display: flex; flex-direction: column; gap: 0.3rem; min-width: 16rem; }
 .memory-record-row, .memory-sides { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
 .memory-sides .is-picked { outline: 2px solid currentColor; }

@@ -55,7 +55,9 @@ when it has one (`<stem>.wram.bin`, for groups limited to some screens) and the 
 eyes (as the emulator calls it). `vbcolor-parity` renders the same frames from the play pack and
 prints the frames and pixels that differ (exit code 1 if any). `npm test` runs this on the synthetic fixture pack
 (`tests/fixtures/fixture-pack.mjs`) whenever `native/build/tests/Release/vbcolor-parity.exe` exists
-(`src/native-parity.test.js`). On Oct 2 2026: Mario's Tennis 52
+(`src/native-parity.test.js`). On Oct 14 2026, with the shared-tile neighbour rule
+(`SharedTileOwners`, src/shared-tile-owner.js): Mario's Tennis 489 frames, 0 pixels different; Mario
+Clash 158 frames, 228 right-eye pixels on 114 frames, the same with the rule off (older gap). On Oct 2 2026: Mario's Tennis 52
 frames, Mario Clash 158 + 30 frames, 0 pixels different. An optional third argument limits one
 group in the exported copy (`"KoopaBackground=except:pool-gamemenu"`) to check screen gating: on
 Oct 5 2026, Mario's Tennis 142 frames, 0 pixels different, the 3 GameMenu frames changed.

@@ -5,6 +5,7 @@
  */
 import { getCompositePixelInfo } from '../../src/color-layer.js';
 import { stereoTwins } from '../../src/stereo-twin.js';
+import { isMirrored, placePoseTile } from '../../src/pose-mirror.js';
 import { frameState, frameWram, renderFrame, renderPoseLayer, poseBounds, poseTileLookup, shadeAt, frameLabel, FRAME_W, FRAME_H } from '../shared/pack-session.js';
 import { getTileBytes, hashTile } from '../../src/vip-state.js';
 import { freeCrop } from '../shared/stage-view.js';
@@ -105,8 +106,7 @@ function clipToCurrentGroupTiles(crop, scale) {
   if (!view?.origin) return;
   const path = new Path2D();
   for (const tile of view.pose.tiles || []) {
-    const x = view.origin.x + (tile.dx || 0);
-    const y = view.origin.y + (tile.dy || 0);
+    const { x, y } = placePoseTile(tile, view.origin);
     path.rect((x - crop.x) * scale, (y - crop.y) * scale, 8 * scale, 8 * scale);
   }
   ctx.stageCtx.clip(path);
@@ -136,7 +136,7 @@ export function composePoseLayer(view) {
   }
   const state = view.origin && view.frameIndex >= 0 ? frameState(ctx.session, view.frameIndex) : null;
   if (!state) return false;
-  const key = `${view.frameIndex}|${view.pose.poseId}|${view.origin.x},${view.origin.y}|${ctx.eye()}|${ctx.brightness()}|${showTouchUps()}|${showUnpainted()}|${ctx.ownPaintOnly()}`;
+  const key = `${view.frameIndex}|${view.pose.poseId}|${view.origin.x},${view.origin.y}${view.origin.mirrorH ? 'h' : ''}${view.origin.mirrorV ? 'v' : ''}|${ctx.eye()}|${ctx.brightness()}|${showTouchUps()}|${showUnpainted()}|${ctx.ownPaintOnly()}`;
   if (key === poseLayerKey) {
     view.unpainted = poseLayerUnpainted;
     return true;
@@ -311,7 +311,7 @@ function composeOriginal(view) {
     originalCanvas.width = FRAME_W;
     originalCanvas.height = FRAME_H;
   }
-  const key = `${view.frameIndex}|${view.pose.poseId}|${view.origin.x},${view.origin.y}|${ctx.eye()}`;
+  const key = `${view.frameIndex}|${view.pose.poseId}|${view.origin.x},${view.origin.y}${view.origin.mirrorH ? 'h' : ''}${view.origin.mirrorV ? 'v' : ''}|${ctx.eye()}`;
   if (key === originalKey) return originalCanvas;
   const octx = /** @type {CanvasRenderingContext2D} */ (originalCanvas.getContext('2d'));
   const image = octx.createImageData(FRAME_W, FRAME_H);
@@ -484,7 +484,7 @@ export function drawStage() {
 
   const setNote = setRect ? ` · one set: ${view.set.indices.length} of ${view.pose.tiles.length} tiles` : '';
   const zoomNote = ctx.freeView ? ' · wheel zoom (Fit to reset)' : '';
-  ctx.el('stage-note').textContent = `${frameLabel(ctx.session, view.frameIndex) || '—'} · ${scale}×${zoomNote}${setNote}${ctx.stageMirror ? ' · mirrored' : ''}${originalOn() ? ' · original' : ''}${ctx.sideBySide() ? ' · painted | reference' : ''}`;
+  ctx.el('stage-note').textContent = `${frameLabel(ctx.session, view.frameIndex) || '—'} · ${scale}×${zoomNote}${setNote}${ctx.stageMirror ? ' · mirrored' : ''}${isMirrored(view.origin) ? ' · the game draws it mirrored here' : ''}${originalOn() ? ' · original' : ''}${ctx.sideBySide() ? ' · painted | reference' : ''}`;
 }
 
 /** The layer's window on screen, when the selected group's overpaint hides its tiles. */

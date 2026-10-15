@@ -1,7 +1,7 @@
 ---
 status: current
-last-reviewed: 2026-10-10
-covers: src/color-layer.js, src/art-pack.js, src/vip-state.js, src/group-tile-colors.js, src/overpaint.js, src/screen-gate.js, src/affine-world.js
+last-reviewed: 2026-10-14
+covers: src/color-layer.js, src/shared-tile-owner.js, src/art-pack.js, src/vip-state.js, src/group-tile-colors.js, src/overpaint.js, src/screen-gate.js, src/affine-world.js
 ---
 
 # Art pipeline: from a captured frame to a coloured pixel
@@ -57,7 +57,9 @@ patterns are tens of KB; the captured frames are what make a pack large.
 Before drawing, `groupsForScreen` (`src/screen-gate.js`) drops groups that shouldn't paint on this
 frame: a group limited to some **screens** (*Paint shows on*, memory pools matched by the frame's
 RAM) or to some **game states** (*Paint shows when…*, `src/game-states.js`). Where two remaining
-groups both claim a draw and both have paint for its pattern, the group **listed first** wins
+groups both claim a draw and paint its pattern differently, the group whose own tiles are **next to
+it** wins (`src/shared-tile-owner.js`: the draws beside it on the same world and layer, or the map
+cells beside it on a scaled layer); where nothing next to it tells, the group **listed first** wins
 (`src/group-order.js`).
 
 ## 5. The colour layer

@@ -67,9 +67,20 @@ describe('sharedTileWins', () => {
     const H3 = hashTile(PT2.subarray(48, 64)) >>> 0;
     const mario = group('Mario', RED);
     const luigi = withGroupTileColor(group('Luigi', BLUE, { hashes: [H1, H3] }), H3, BLUE);
-    const st = { patternTable: PT2, drawList: [{ tileIndex: 1, x: 8, y: 8 }, { tileIndex: 3, x: 16, y: 8 }].map((d) => ({ layer: 0, eye: 0, world: 30, ...d })) };
+    // Luigi's own tile elsewhere on screen, not next to the shared one.
+    const st = { patternTable: PT2, drawList: [{ tileIndex: 1, x: 8, y: 8 }, { tileIndex: 3, x: 100, y: 8 }].map((d) => ({ layer: 0, eye: 0, world: 30, ...d })) };
     const [p] = sharedTileWins(st, [mario, luigi]);
     expect(p).toMatchObject({ winnerElsewhere: false, loserElsewhere: true });
+  });
+
+  it('leaves out a tile its neighbours give to one group (src/shared-tile-owner.js)', () => {
+    const PT2 = PT.slice();
+    PT2.fill(0x55, 48, 64); // tile 3: Luigi's own
+    const H3 = hashTile(PT2.subarray(48, 64)) >>> 0;
+    const mario = group('Mario', RED);
+    const luigi = withGroupTileColor(group('Luigi', BLUE, { hashes: [H1, H3] }), H3, BLUE);
+    const st = { patternTable: PT2, drawList: [{ tileIndex: 1, x: 8, y: 8 }, { tileIndex: 3, x: 16, y: 8 }].map((d) => ({ layer: 0, eye: 0, world: 30, ...d })) };
+    expect(sharedTileWins(st, [mario, luigi])).toEqual([]);
   });
 
   it('leaves out tiles a picture covers', () => {

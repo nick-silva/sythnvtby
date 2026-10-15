@@ -8,6 +8,7 @@ import { normalizeReferences, referenceForFrame } from '../../src/frame-metadata
 import { fillTilesFromReference } from '../../src/reference-fill.js';
 import { getTileBytes, hashTile } from '../../src/vip-state.js';
 import { isObjGroup } from '../../src/obj-sprite-profiles.js';
+import { placePoseTile } from '../../src/pose-mirror.js';
 
 /** SpriteStudio's state and functions this part uses (tools/sprite-studio.js passes them in). */
 let ctx;
@@ -165,7 +166,10 @@ export function currentGroupPlacements() {
   const state = frameState(ctx.session, view.frameIndex);
   if (!state?.drawList?.length || !state.patternTable) return { placements: [], patterns: new Map() };
   const wanted = new Map();
-  for (const t of view.pose.tiles || []) wanted.set(`${view.origin.x + (t.dx || 0)},${view.origin.y + (t.dy || 0)}`, t.hash >>> 0);
+  for (const t of view.pose.tiles || []) {
+    const at = placePoseTile(t, view.origin);
+    wanted.set(`${at.x},${at.y}`, t.hash >>> 0);
+  }
   const placements = [];
   const patterns = new Map();
   for (const d of state.drawList) {

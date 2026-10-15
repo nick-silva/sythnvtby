@@ -536,6 +536,20 @@
     .find-pose-label { font-family: var(--font-mono); color: var(--muted); }
     .find-poses-dups { display: flex; flex-direction: column; gap: 0.3rem; max-height: 14rem; overflow-y: auto; }
     .find-pose-dup { display: flex; gap: 0.4rem; align-items: flex-start; font-size: 0.72rem; line-height: 1.35; }
+    .rail-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+    .rail-head button { font-size: 0.68rem; padding: 0.15rem 0.45rem; }
+    #find-sprites-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+    #find-sprites-dialog { border: 1px solid var(--border); border-radius: 6px; padding: 0; background: var(--surface); color: var(--text); width: min(96vw, 50rem); }
+    #find-sprites-dialog form { padding: 0.65rem 0.75rem 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; max-height: 88vh; }
+    #find-sprites-dialog h2 { margin: 0; font-size: 0.85rem; font-weight: 600; }
+    #find-sprites-dialog p { margin: 0; font-size: 0.72rem; line-height: 1.4; }
+    .find-sprites-list { display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; min-height: 0; }
+    #find-sprites-list { flex: 1 1 auto; }
+    .find-sprites-small > summary { font-size: 0.74rem; cursor: pointer; }
+    .find-sprites-small[open] .find-sprites-list { max-height: 16rem; margin-top: 0.4rem; }
+    .find-sprite-char { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.45rem; border: 1px solid var(--border); border-radius: 5px; }
+    .find-sprite-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; font-size: 0.74rem; }
+    .find-sprite-head input[type="text"] { font: inherit; width: 12rem; max-width: 100%; }
     #autopaint-dialog form { padding: 0.65rem 0.75rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
     #autopaint-dialog h2 { margin: 0; font-size: 0.85rem; font-weight: 600; }
     #autopaint-dialog p { margin: 0; font-size: 0.74rem; line-height: 1.4; }
@@ -632,7 +646,10 @@
           aria-label="Search groups by name or folder" title="Filters as you type: every word must appear in a group's name or folder. Enter selects the first match, Esc clears. Ctrl+K jumps here." />
         <span id="group-search-count" class="muted" aria-live="polite"></span>
       </div>
-      <h2>Sprites</h2>
+      <div class="rail-head">
+        <h2>Sprites</h2>
+        <button type="button" id="btn-find-sprites" disabled title="Look through the captured frames for sprites no group keeps yet, grouped into characters by the tiles their poses share. Pick which become sprite groups, or new poses of a group you have.">Find sprites…</button>
+      </div>
       <div id="sprite-list"><p class="empty">Open a .vbpack to list its sprite groups.</p></div>
       <h2>Other groups</h2>
       <div id="other-list"><p class="empty">—</p></div>
@@ -815,12 +832,29 @@
       </section>
       <section id="find-poses-dups" class="find-poses-section">
         <h3>Kept twice <span class="muted" id="find-poses-dups-count"></span></h3>
-        <p class="muted">Poses with the same tiles in the same places. Removing one moves its animation steps, and its overpaint if the one kept has none, to the one kept; the tiles and their paint stay.</p>
+        <p class="muted">Poses with the same tiles in the same places (for a sprite, also one that is the other's mirror image). Removing one moves its animation steps, and its overpaint if the one kept has none, to the one kept; the tiles and their paint stay.</p>
         <div class="find-poses-dups" id="find-poses-dups-list"></div>
       </section>
       <div class="autopaint-actions">
         <button type="button" id="find-poses-cancel">Cancel</button>
         <button type="button" id="find-poses-apply" class="primary">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="find-sprites-dialog" aria-labelledby="find-sprites-title">
+    <form method="dialog">
+      <h2 id="find-sprites-title">Find sprites</h2>
+      <p id="find-sprites-summary"></p>
+      <div class="find-sprites-list" id="find-sprites-list"></div>
+      <details id="find-sprites-small" class="find-sprites-small">
+        <summary>Small bits <span class="muted" id="find-sprites-small-count"></span></summary>
+        <p class="muted">Sprites of one or two tiles that share nothing with another: sparks, digits, bits of debris. Not ticked; tick any that is a character of its own.</p>
+        <div class="find-sprites-list" id="find-sprites-small-list"></div>
+      </details>
+      <div class="autopaint-actions">
+        <button type="button" id="find-sprites-cancel">Cancel</button>
+        <button type="button" id="find-sprites-apply" class="primary">Apply</button>
       </div>
     </form>
   </dialog>

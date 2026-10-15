@@ -14,6 +14,7 @@ import { getTileBytes, hashTile, isBlankTile, tileLocalFromVip } from '../../src
 import { stereoTwins } from '../../src/stereo-twin.js';
 import { tileToRgba } from '../../src/vb-2bpp.js';
 import { clusterTilePositions, pickCluster } from '../../src/tile-clusters.js';
+import { placePoseTile, poseOrientations } from '../../src/pose-mirror.js';
 import { DEFAULT_FADE_RESPONSE, getCompositePixelInfo } from '../../src/color-layer.js';
 import { overlayBrightness, overlayGroupsOnScreen } from '../../src/painter-v2-vip-overlay.js';
 import { decodeGroupTileColors, groupWithEncodedTileColors } from '../../src/group-tile-colors.js';
@@ -1052,9 +1053,11 @@ function hasherFor(state) {
  * Where a pose sits in a given frame: poses store tile offsets relative to an
  * anchor *pattern*, so the anchor draw has to be found in the frame first. When
  * several draws share the anchor hash, the one whose neighbours match the most
- * pose tiles wins.
+ * pose tiles wins. A pose not found whole as captured is also tried mirrored
+ * (src/pose-mirror.js) — a sprite facing the other way — unless *Mirror OK* is off;
+ * `mirrorH` / `mirrorV` say which way it was found, and a tie goes to the pose as captured.
  * @param {any} state @param {any} pose @param {number} [eye]
- * @returns {{ x: number, y: number, matched: number, total: number, flipH: boolean, flipV: boolean } | null}
+ * @returns {{ x: number, y: number, matched: number, total: number, flipH: boolean, flipV: boolean, mirrorH: boolean, mirrorV: boolean } | null}
  */
 export function locatePose(state, pose, eye = 0) {
   const tiles = Array.isArray(pose?.tiles) ? pose.tiles : [];
@@ -1078,13 +1081,19 @@ export function locatePose(state, pose, eye = 0) {
   }
 
   let best = null;
-  for (const c of candidates) {
-    let matched = 0;
-    for (const t of tiles) {
-      if (hashesAt.get(`${c.x + (t.dx || 0)},${c.y + (t.dy || 0)}`)?.has(t.hash >>> 0)) matched++;
-    }
-    if (!best || matched > best.matched) {
-      best = { x: c.x, y: c.y, matched, total: tiles.length, flipH: c.flipH === true, flipV: c.flipV === true };
+  for (const orientation of poseOrientations(pose)) {
+    // Mirrored is only worth trying when the pose as captured is not all there.
+    if (best && best.matched === tiles.length) break;
+    for (const c of candidates) {
+      const origin = { x: c.x, y: c.y, ...orientation };
+      let matched = 0;
+      for (const t of tiles) {
+        const at = placePoseTile(t, origin);
+        if (hashesAt.get(`${at.x},${at.y}`)?.has(t.hash >>> 0)) matched++;
+      }
+      if (!best || matched > best.matched) {
+        best = { ...origin, matched, total: tiles.length, flipH: c.flipH === true, flipV: c.flipV === true };
+      }
     }
   }
   return best;
@@ -1100,7 +1109,10 @@ export function poseDraws(state, pose, origin, eye = 0) {
   const tiles = Array.isArray(pose?.tiles) ? pose.tiles : [];
   if (!state?.drawList?.length || !state.patternTable || !tiles.length || !origin) return [];
   const wanted = new Map();
-  for (const t of tiles) wanted.set(`${origin.x + (t.dx || 0)},${origin.y + (t.dy || 0)}`, t.hash >>> 0);
+  for (const t of tiles) {
+    const at = placePoseTile(t, origin);
+    wanted.set(`${at.x},${at.y}`, t.hash >>> 0);
+  }
   const hashOf = hasherFor(state);
   return state.drawList.filter(
     (d) => (d.eye ?? 0) === eye && wanted.get(`${d.x},${d.y}`) === hashOf(d.tileIndex),
@@ -1160,8 +1172,7 @@ export function renderPoseLayer({ session, state, pose, origin, imageData, eye =
   // still spill (windows, clipping), and another group's paint must not ride along.
   const inFootprint = new Uint8Array(FRAME_W * FRAME_H);
   for (const t of pose.tiles) {
-    const tx = origin.x + (t.dx || 0);
-    const ty = origin.y + (t.dy || 0);
+    const { x: tx, y: ty } = placePoseTile(t, origin);
     for (let y = Math.max(0, ty); y < Math.min(FRAME_H, ty + 8); y++) {
       for (let x = Math.max(0, tx); x < Math.min(FRAME_W, tx + 8); x++) inFootprint[y * FRAME_W + x] = 1;
     }
@@ -1225,8 +1236,7 @@ export function poseBounds(pose, origin = { x: 0, y: 0 }) {
   let x1 = -Infinity;
   let y1 = -Infinity;
   for (const t of tiles) {
-    const x = ax + (Number(t.dx) || 0);
-    const y = ay + (Number(t.dy) || 0);
+    const { x, y } = placePoseTile(t, { ...origin, x: ax, y: ay });
     if (x < x0) x0 = x;
     if (y < y0) y0 = y;
     if (x + 8 > x1) x1 = x + 8;

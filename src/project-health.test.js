@@ -78,9 +78,15 @@ describe('checkProject', () => {
     const luigi = painted(group('Luigi-PlayingAs', [1, 2, 3]), [1, 2, 3], BLUE);
     const LUIGI_ONLY = [1, 2, 3];
     const MARIO_ONLY = [1, 2, 4];
+    // Tiles 16 px apart: nothing next to a shared tile says whose it is, so the list order decides.
+    const apart = (world, tiles) => {
+      const st = frame(world, tiles);
+      st.drawList.forEach((d, i) => { d.x = i * 16; });
+      return st;
+    };
 
     it('the other group on screen alone, taking the first one’s colours: offers to let it win', () => {
-      const [issue, ...rest] = run([mario, luigi], [frame(30, LUIGI_ONLY), frame(30, LUIGI_ONLY)]);
+      const [issue, ...rest] = run([mario, luigi], [apart(30, LUIGI_ONLY), apart(30, LUIGI_ONLY)]);
       expect(rest).toEqual([]);
       expect(issue).toMatchObject({
         kind: 'order',
@@ -95,7 +101,7 @@ describe('checkProject', () => {
     });
 
     it('each on screen alone somewhere: the order cannot suit both, so it offers to tell them apart by a game state', () => {
-      const [issue] = run([mario, luigi], [frame(30, MARIO_ONLY), frame(30, LUIGI_ONLY)]);
+      const [issue] = run([mario, luigi], [apart(30, MARIO_ONLY), apart(30, LUIGI_ONLY)]);
       expect(issue).toMatchObject({
         kind: 'order',
         problem: true,
@@ -106,13 +112,17 @@ describe('checkProject', () => {
     });
 
     it('always on screen together: worth knowing, not a problem', () => {
-      const [issue] = run([mario, luigi], [frame(30, [1, 2, 3, 4])]);
+      const [issue] = run([mario, luigi], [apart(30, [1, 2, 3, 4])]);
       expect(issue).toMatchObject({ kind: 'order', problem: false, frames: 1 });
       expect(issue.sentence).toBe('Mario-PlayingAs and Luigi-PlayingAs are on screen together on 1 frame and both paint 2 tiles: one pattern on one layer takes one group’s colour, so they show Mario-PlayingAs’s (listed first).');
     });
 
+    it('a shared tile next to the group’s own tiles goes to that group: nothing to say', () => {
+      expect(run([mario, luigi], [frame(30, LUIGI_ONLY)])).toEqual([]);
+    });
+
     it('only the first one on screen: its colours are right, nothing to say', () => {
-      expect(run([mario, luigi], [frame(30, MARIO_ONLY)])).toEqual([]);
+      expect(run([mario, luigi], [apart(30, MARIO_ONLY)])).toEqual([]);
     });
   });
 

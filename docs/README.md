@@ -91,6 +91,7 @@ under `native/` for the PC player.
 | `auto-capture.js`, `tile-clusters.js`, `paint-gaps.js` | Auto-capture: which sprite tiles are captured, grouping tiles into on-screen clusters, and *Where paint doesn't cover yet* (unpainted tiles; a backdrop's tiles past its overpaint). |
 | `display-hotkeys.js`, `stereo-view.js`, `stereo-output.js` | F9/F10 before/after keys; the monochrome picture's 3D view (core option); both eyes of the colour layer as side-by-side or anaglyph. |
 | `memory-recorder.js`, `memory-panel.js` | The Memory panel: recording a question's sides while playing; which screen and game states hold right now. |
+| `frame-poses.js`, `poses-panel.js` | The Poses panel: per character, the kept poses whole on the frame on screen and whether each pose picture was drawn (or why not), from the colour layer's last frame (`lastFrame`, `getDrawnPictures` in `color-layer.js`). |
 | `vb-emulator-ram.js`, `mednafen-savestate-wram.js` | The game's 64 KB WRAM from the running core, or from a save state. |
 | `rom-storage.js`, `vbpack-storage.js`, `project-home.js`, `handoff-store.js`, `unsaved-work.js` | The last ROM and pack (IndexedDB), the project home folder, passing a pack between pages, and the shared wording for unsaved work. |
 | `palette-layer.js`, `palette-diagnostics.js` | Palette mode (remap the four shades) and its self-check. |
@@ -116,6 +117,7 @@ under `native/` for the PC player.
 | Module | What it does |
 |--------|--------------|
 | `color-layer.js` | **The compositor** (`compositeColorFrame`, one options object): pack colours, overrides, groups, pictures, fades, both eyes. Apps call it through `src/project.js`, never with hand-built options. |
+| `shared-tile-owner.js` | Which group colours a tile two groups paint differently: the one whose own tiles are next to it (on a scaled layer, next to it in the map), else the first listed. Used by the compositor, *This pixel* and the shared-tile checks; mirrored in `colorizer.cpp`. |
 | `fade.js` | Dimming colour with the game's brightness. |
 | `affine-world.js`, `affine-base.js` | Scaled and rotated (affine) layers sampled pixel by pixel, and their base tiles laid out 1:1. |
 | `stereo-twin.js` | Layers drawn twice, once per eye, in neighbouring worlds. |
@@ -125,7 +127,9 @@ under `native/` for the PC player.
 | `transparent-paint.js`, `starter-paint.js`, `shade-ramp.js` | Paint on see-through pixels, the starter shades a tile begins with, and colour by shade for tiles the game rewrites. |
 | `frame-summary.js` | What each frame shows, in brief, saved in the pack (`framesummaries.json`) so opening a project need not decode every frame; one summary serves SpriteStudio's frame filter, the Project tool's screen index and the brightness reference. |
 | `uncoloured.js`, `pixel-explain.js` | How much of a frame is uncoloured; "what colours this pixel, or why not" (*This pixel*, Pick). |
-| `pose-suggest.js` | Find poses: a background character's poses not kept yet, and poses kept twice, folded into their twin. |
+| `pose-suggest.js` | Find poses: a background character's poses not kept yet, and poses kept twice (scaled poses by their patterns), folded into their twin. |
+| `sprite-suggest.js` | Find sprites and a sprite group's Find poses: each frame's OBJ tiles clustered into sprites, kept poses peeled out (any way round), touching and cut-off sprites left out, the rest grouped into characters by shared patterns. |
+| `pose-mirror.js` | Mirrored poses: the four orientations, and where a pose tile sits for a pose found mirrored (`locatePose` tries them when *Mirror OK*). |
 | `pose-autopaint.js`, `original-view.js` | Auto-paint: a group's unpainted poses coloured from its painted ones, pixel by pixel from what surrounds each; a pose's original monochrome picture (SpriteStudio's *Original*). |
 
 ### `src/` — groups, poses and when paint shows
@@ -182,7 +186,8 @@ UI-free view of a loaded pack (frames, groups, paint, a frame renderer). Its par
 | `overpaint.js`, `recovery.js` | Overpaint and pose pictures (through `src/picture-store.js`); recovered pictures and the Overpaint panel. |
 | `group-list.js`, `tracks.js` | The group lists, folders and search; animation tracks. |
 | `reference.js`, `ghost-box.js` | Reference images; side by side and the ghost box. |
-| `find-poses.js` | The Find poses window: new poses and duplicates to tick, one Apply (`src/pose-suggest.js`). |
+| `find-poses.js` | The Find poses window: new poses and duplicates to tick, one Apply (`src/pose-suggest.js`, `src/sprite-suggest.js` for a sprite group). |
+| `find-sprites.js` | The Find sprites window: suggested characters as new sprite groups or poses of one, made on Apply (`src/sprite-suggest.js`). |
 | `autopaint.js` | The Auto-paint window: which poses to learn from and which to paint, progress, one undo step (`src/pose-autopaint.js`). |
 
 ### `tools/` — shared and other pages
@@ -314,7 +319,8 @@ or **living** (a plan that changes as work moves).
 
 | Doc | What it covers |
 |-----|----------------|
-| [pose-aware-rendering.md](design/pose-aware-rendering.md) | Which group colours a tile two groups share: today the first listed; proposed, the group whose pose the draw is part of (backlog #16), with what is left after game states fixed Mario vs Luigi. |
+| [libretro-core.md](design/libretro-core.md) | **Proposed:** a sythnvtby libretro core for RetroArch and other frontends: installing it, loading a game, colour packs found by ROM SHA-1, and a packs repo on GitHub (backlog #19). |
+| [pose-aware-rendering.md](design/pose-aware-rendering.md) | Which group colours a tile two groups share: the group whose own tiles are next to it (built Oct 14, `src/shared-tile-owner.js`), else the first listed; the pose-based plan it replaced, with the measurements. |
 | [obj-sprite-profiles-design.md](design/obj-sprite-profiles-design.md) | Sprite poses and animation tracks. |
 | [overpaint.md](reference/overpaint.md) | **Current:** how overpaint works — what turns it on, where it draws, depth, stereo, groups sharing a layer, and sprite vs plain vs scaled groups side by side. Start here for overpaint. |
 | [overpaint-redesign.md](design/overpaint-redesign.md) | **Partial (built Oct 2026):** replace touch-ups and layer art with one picture per group placed in its layer's map (so it survives scrolling); why touch-ups drop out today. |

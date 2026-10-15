@@ -14,7 +14,10 @@ export const repoModule = (rel) => pathToFileURL(resolve(REPO_ROOT, rel)).href;
 const workspace = resolve(REPO_ROOT, '..');
 export const BASE = process.env.E2E_BASE_URL || 'http://localhost:5173';
 export const OUT = resolve(REPO_ROOT, 'tests', 'e2e', '.out').replace(/\\/g, '/');
-export const ROM = process.env.VB_ROM || resolve(workspace, 'Mario Clash (Japan, USA).vb');
+const ROM_NAME = 'Mario Clash (Japan, USA).vb';
+export const ROM = process.env.VB_ROM
+  || [resolve(workspace, 'ROMS', ROM_NAME), resolve(workspace, ROM_NAME)].find((p) => existsSync(p))
+  || resolve(workspace, 'ROMS', ROM_NAME);
 export const PACK_ANNOTATED = process.env.VB_PACK_ANNOTATED || resolve(workspace, 'marioclash-annotated.vbpack');
 export const PACK_PLAIN = process.env.VB_PACK_PLAIN || resolve(workspace, 'marioclash.vbpack');
 /** Optional: a pack with captures of an affine (zooming) scene. Tests that need it skip without it. */

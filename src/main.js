@@ -64,6 +64,7 @@ import { getWindowsTableBytesFromState, getBgAffineWorldClipRect } from './vip-w
 import { discardCapturesPrompt, unsavedCapturesNote, captureGapsNote } from './unsaved-work.js';
 import { createMemoryRecorder } from './memory-recorder.js';
 import { createMemoryPanel } from './memory-panel.js';
+import { createPosesPanel } from './poses-panel.js';
 import { matchedScreens, screenLabel } from './screen-gate.js';
 import { gameStatesOf } from './game-states.js';
 
@@ -117,11 +118,27 @@ const packFileInput = document.getElementById('pack-file-input');
 const lastVbpackBtn = document.getElementById('last-vbpack-btn');
 
 const RELOAD_TO_LOAD_LAST_VBPACK = 'vb-load-last-vbpack-on-start';
+/** Session flag: the page reloaded to start a ROM picked while another game ran; its bytes wait in the handoff store. */
+const RELOAD_TO_OPEN_ROM = 'vb-open-rom-on-start';
+const HANDOFF_KEY_RELOAD_ROM = 'reload-rom';
+const HANDOFF_KEY_RELOAD_ROM_NAME = 'reload-rom-name';
 let currentRomBlobUrl = null;
 /** Copy of current ROM buffer (for Export .vbpack); blob URL can become invalid. */
 let currentRomBuffer = null;
 /** Set true when startEmulator has ever run; used to decide we must reload before loading another ROM. */
 let emulatorStarted = false;
+
+/**
+ * The emulator can't be torn down in place: starting a second game leaves the first core running,
+ * and both push frames into the colour layer — two games flickering on one screen. So a second
+ * game starts on a fresh page: the caller stores what to open, then this reloads with `flag` set.
+ * @param {string} flag
+ */
+function reloadToStart(flag) {
+  sessionStorage.setItem(flag, '1');
+  leavingOnPurpose = true;
+  location.reload();
+}
 
 function setLastVbpackButton(displayName) {
   if (!lastVbpackBtn) return;
@@ -366,6 +383,20 @@ function initMemoryPanel() {
   document.getElementById('btn-memory')?.addEventListener('click', () => {
     memoryPanel?.toggle();
     document.getElementById('btn-memory')?.setAttribute('aria-pressed', document.getElementById('memory-panel')?.hidden ? 'false' : 'true');
+  });
+}
+/**
+ * The Poses panel (src/poses-panel.js): which kept poses the frame on screen shows and which pose
+ * pictures were drawn, from the last frame the colour layer drew.
+ */
+function initPosesPanel() {
+  const root = document.getElementById('poses-panel');
+  const btn = document.getElementById('btn-poses');
+  if (!root || !btn) return;
+  const panel = createPosesPanel({ root, read: () => colorLayer.lastFrame(), colourOn: () => displayMode === 'color' });
+  btn.addEventListener('click', () => {
+    panel.toggle();
+    btn.setAttribute('aria-pressed', root.hidden ? 'false' : 'true');
   });
 }
 /** groupsSchemaVersion from groups.json when present (e.g. 2 when pools are authored). */
@@ -1953,11 +1984,6 @@ packFileInput?.addEventListener('change', async (e) => {
  */
 async function loadVbpackFromUserFile(buffer, fileName) {
   const result = await parseArtPack(buffer);
-  hasTemporaryVbpack = false;
-  temporaryVipStates = [];
-  capturesSavedCount = 0;
-  // File-input loads have no handle; the picker path sets one right after this returns.
-  currentPackFileHandle = null;
   const fromFile = String(fileName || '')
     .replace(/\.vbpack$/i, '')
     .replace(/\.zip$/i, '')
@@ -1971,6 +1997,22 @@ async function loadVbpackFromUserFile(buffer, fileName) {
       ? result.manifest.gameId.trim()
       : '';
   const displayName = fromFile || fromRom || fromGameId || 'pack';
+  if (emulatorStarted) {
+    // Another game is running: open this one as the last pack on a fresh page (reloadToStart).
+    try {
+      await saveLastVbpack(buffer, displayName);
+    } catch (err) {
+      reportProblem(`Could not open ${displayName} while another game is running — reload the page, then open it again.`, err);
+      return;
+    }
+    reloadToStart(RELOAD_TO_LOAD_LAST_VBPACK);
+    return;
+  }
+  hasTemporaryVbpack = false;
+  temporaryVipStates = [];
+  capturesSavedCount = 0;
+  // File-input loads have no handle; the picker path sets one right after this returns.
+  currentPackFileHandle = null;
   currentVbpackDisplayName = displayName;
   await saveLastVbpack(buffer, displayName).catch(() => {});
   setLastVbpackButton(displayName);
@@ -2066,6 +2108,10 @@ void refreshProjectHomeUi();
  * @param {ArrayBuffer} buffer
  */
 function startFreshRom(name, buffer) {
+  if (emulatorStarted) {
+    void reloadToStartRom(name, buffer);
+    return;
+  }
   currentVbpackDisplayName = null;
   lastPackPaintsTransparent = false;
   colorLayer.setDrawTransparentPaint?.(false);
@@ -2090,6 +2136,23 @@ function startFreshRom(name, buffer) {
     window.EJS_loadStateURL = undefined;
   } catch (_) {}
   startWithRomData(name, buffer);
+}
+
+/**
+ * Another game is running: keep this ROM in the handoff store and start it on a fresh page
+ * (reloadToStart). If it can't be stored, the running game is left as it is.
+ * @param {string} name
+ * @param {ArrayBuffer} buffer
+ */
+async function reloadToStartRom(name, buffer) {
+  try {
+    await putHandoff(HANDOFF_KEY_RELOAD_ROM, buffer);
+    await putHandoff(HANDOFF_KEY_RELOAD_ROM_NAME, name || '');
+  } catch (err) {
+    reportProblem(`Could not start ${name || 'that ROM'} while another game is running — reload the page, then load it again.`, err);
+    return;
+  }
+  reloadToStart(RELOAD_TO_OPEN_ROM);
 }
 
 romInput?.addEventListener('change', (e) => {
@@ -2136,9 +2199,7 @@ lastVbpackBtn?.addEventListener('click', (e) => {
       return;
     }
     if (emulatorStarted) {
-      sessionStorage.setItem(RELOAD_TO_LOAD_LAST_VBPACK, '1');
-      leavingOnPurpose = true;
-      location.reload();
+      reloadToStart(RELOAD_TO_LOAD_LAST_VBPACK);
       return;
     }
     try {
@@ -3231,6 +3292,7 @@ function setAutoCapture(on) {
 }
 
 initMemoryPanel();
+initPosesPanel();
 
 document.getElementById('btn-auto-capture')?.addEventListener('click', async () => {
   if (autoCaptureOn) {
@@ -3382,12 +3444,28 @@ if (sessionStorage.getItem(RELOAD_TO_LOAD_LAST_VBPACK)) {
     if (stored?.buffer) {
       try {
         const result = await parseArtPack(stored.buffer);
+        currentVbpackDisplayName = stored.name || (result.manifest?.gameId || result.manifest?.romFileName || 'pack');
         applyVbpackResult(result);
       } catch (err) {
         reportProblem(`Could not reopen the last pack: ${err?.message || err}`, err);
       }
     }
   });
+}
+
+if (sessionStorage.getItem(RELOAD_TO_OPEN_ROM)) {
+  sessionStorage.removeItem(RELOAD_TO_OPEN_ROM);
+  Promise.all([getHandoff(HANDOFF_KEY_RELOAD_ROM), getHandoff(HANDOFF_KEY_RELOAD_ROM_NAME)])
+    .then(([buffer, name]) => {
+      deleteHandoff(HANDOFF_KEY_RELOAD_ROM).catch(() => {});
+      deleteHandoff(HANDOFF_KEY_RELOAD_ROM_NAME).catch(() => {});
+      if (buffer instanceof ArrayBuffer && buffer.byteLength > 0) {
+        startFreshRom(typeof name === 'string' && name ? name : 'rom.vb', buffer);
+      } else {
+        reportProblem('The ROM picked before the reload was not found — load it again.');
+      }
+    })
+    .catch((err) => reportProblem(`Could not start the ROM after reloading: ${err?.message || err}`, err));
 }
 
 // If returning from painter, apply updated pack + restore save state.

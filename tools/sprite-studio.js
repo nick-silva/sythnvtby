@@ -197,6 +197,7 @@ import {
 } from './sprite-studio/render.js';
 import { initAutopaint, openAutopaint } from './sprite-studio/autopaint.js';
 import { initFindPoses } from './sprite-studio/find-poses.js';
+import { initFindSprites } from './sprite-studio/find-sprites.js';
 import {
   initGhostBox,
   colourForHash,
@@ -440,6 +441,7 @@ async function openPack(buffer, label, preferGroupId = null, fileHandle = null) 
   if (journal) markDirty();
   clearEmptyFolders();
   renderSpriteLists();
+  el('btn-find-sprites').disabled = !session.frames.length;
   const { objs, rest } = spriteGroups(session);
   const preferred = preferGroupId ? session.groups.find((g) => g.id === preferGroupId) : null;
   selectGroup(preferred || objs[0] || rest[0] || null);
@@ -709,6 +711,15 @@ el('btn-autopaint').addEventListener('click', openAutopaint);
 initFindPoses({
   get el() { return el; },
   get selectedGroup() { return selectedGroup; },
+  get session() { return session; },
+  setStatus,
+});
+
+initFindSprites({
+  get el() { return el; },
+  markDirty,
+  renderSpriteLists,
+  selectGroup,
   get session() { return session; },
   setStatus,
 });

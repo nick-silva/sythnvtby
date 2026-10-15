@@ -1,13 +1,14 @@
 /**
  * Which group's paint wins a shared tile, and changing that.
  *
- * When two groups both claim a draw and both have paint for its pattern, the one listed first in
- * groups.json colours it (resolveGroupTileMatch in src/color-layer.js) and the other's paint for
- * that tile never shows. Nothing marks that on screen, so these helpers name the pairs on a frame
- * and move a group ahead of another — the group list's order is the only priority there is.
+ * When two groups both claim a draw and both have paint for its pattern, the group whose own tiles
+ * are next to it colours it (src/shared-tile-owner.js); where nothing next to it tells, the one
+ * listed first in groups.json does (resolveGroupTileMatch in src/color-layer.js) and the other's
+ * paint for that tile never shows. Nothing marks that on screen, so these helpers name the pairs
+ * on a frame and move a group ahead of another.
  */
 
-import { buildGroupTileColorIndex } from './color-layer.js';
+import { buildGroupTileColorIndex, frameTileOwners } from './color-layer.js';
 import { getTileBytes, hashTile, isBlankTile } from './vip-state.js';
 import { groupMiss } from './pixel-explain.js';
 import { getWindowsTableBytesFromState } from './vip-world-clip.js';
@@ -90,7 +91,8 @@ const sameRgba = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]
 
 /**
  * Pairs of groups where both claim and paint the same tiles on this frame, with different
- * colours: the first in `groups` wins, and the other's paint for those tiles never shows.
+ * colours, and nothing beside a tile says whose it is (src/shared-tile-owner.js): the first in
+ * `groups` wins, and the other's paint for those tiles never shows.
  * `winnerElsewhere` / `loserElsewhere`: whether that group also paints other tiles on the frame —
  * whether it is really on screen, rather than just sharing a pattern with what is.
  * Tiles a picture covers are left out (`covered`, from coveredByPictures): their paint does not
@@ -104,6 +106,7 @@ const sameRgba = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]
 export function sharedTileWins(state, groups, eye = 0, covered = null) {
   const index = buildGroupTileColorIndex(groups);
   if (!index || !state?.drawList || !state.patternTable) return [];
+  const owners = frameTileOwners(state, index, eye);
   /** @type {Map<string, { winner: any, loser: any, hashes: Set<number>, example: { x: number, y: number } | null, winnerElsewhere: boolean, loserElsewhere: boolean }>} */
   const pairs = new Map();
   /** @type {Map<any, Set<number>>} group → painted patterns it claims on this frame */
@@ -126,6 +129,8 @@ export function sharedTileWins(state, groups, eye = 0, covered = null) {
       if (!claimed.has(e.group)) claimed.set(e.group, new Set());
       claimed.get(/** @type {any} */ (e.group)).add(hash);
     }
+    // A tile its neighbours give to one group (src/shared-tile-owner.js) is not the order's to decide.
+    if (claiming.length > 1 && owners.ownerOfDraw(d, hash)) continue;
     for (let i = 1; i < claiming.length; i++) {
       const win = claiming[0];
       const lose = claiming[i];

@@ -365,6 +365,28 @@ await s.test('Frame dropdown jumps to a saved frame (paused by design), Play res
   expect(nPlay > 30, `Play did not resume (${nPlay})`);
 });
 
+// The emulator can't be torn down in place: before Oct 14 a second game started beside the first,
+// both cores fed the colour layer, and the picture flickered between two games.
+await s.test('Opening a second game while one runs starts it on a fresh page, one core only', async () => {
+  const p5 = await context.newPage();
+  instrument(p5, { errors });
+  await p5.goto('http://localhost:5173/');
+  await p5.setInputFiles('#pack-file-input', exported);
+  await p5.waitForFunction(() => !document.getElementById('btn-colorize')?.disabled, null, { timeout: 90000 });
+  const nFirst = await framesAdvanced(p5);
+  const reloaded = p5.waitForEvent('load', { timeout: 60000 }).then(() => true, () => false);
+  await p5.setInputFiles('#pack-file-input', exported);
+  const didReload = await reloaded;
+  await p5.waitForFunction(() => !document.getElementById('btn-colorize')?.disabled, null, { timeout: 90000 });
+  await p5.waitForTimeout(1500);
+  const nSecond = await framesAdvanced(p5);
+  await p5.close();
+  expect(didReload, 'the page did not reload for the second game');
+  expect(nSecond > 30, `second game not running (${nSecond})`);
+  expect(nSecond < nFirst * 1.5, `two cores running: ${nFirst} → ${nSecond} frames in 1.5 s`);
+  return `${nFirst} → ${nSecond} frames in 1.5 s`;
+});
+
 await s.test('No page errors during the emulator run', async () => {
   expect(errors.length === 0, errors.slice(0, 4).join(' | '));
 });

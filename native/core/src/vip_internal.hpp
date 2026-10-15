@@ -196,6 +196,22 @@ inline std::vector<int> affine_worlds(const Mem& m, int eye) {
 }
 
 /**
+ * The character in map cell (cx, cy) of an affine world's map plane, read the way
+ * sample_affine_world reads it (affineMapReader in src/affine-world.js); -1 outside the map or
+ * when the world is not affine.
+ */
+inline int affine_map_char(const Mem& m, int world, int cx, int cy) {
+  if (world < 0 || world > 31) return -1;
+  const int header = m.win(world * kWorldBytes);
+  if (((header >> 12) & 3) != kBgmAffine) return -1;
+  const int map_base = (header & 0xf) * 4096;
+  const int scy = (header >> 8) & 3, scx = (header >> 10) & 3;
+  if (cx < 0 || cy < 0 || cx >= (64 << scx) || cy >= (64 << scy)) return -1;
+  const int addr = (map_base | (((cy >> 6) << 12) << scx) | ((cy & 0x3f) << 6) | ((cx >> 6) << 12) | (cx & 0x3f)) & 0xffff;
+  return m.dram(addr) & 0x7ff;
+}
+
+/**
  * Every screen pixel an affine world samples, as the VIP does (sampleAffineWorld).
  * visit(x, y, ch, tx, ty, pixel, palette, hflip, vflip, rotated, cell).
  */

@@ -1,12 +1,15 @@
 ---
-status: proposed
-last-reviewed: 2026-10-10
-covers: src/color-layer.js, src/group-order.js, src/project-health.js, src/pixel-explain.js, tools/shared/pack-session.js, native/core/src/colorizer.cpp
+status: current
+last-reviewed: 2026-10-14
+covers: src/shared-tile-owner.js, src/color-layer.js, src/group-order.js, src/project-health.js, src/pixel-explain.js, src/affine-world.js, native/core/src/colorizer.cpp
 ---
 
 # Pose-aware rendering: which group colours a shared tile
 
-**On hold since Oct 9 2026**, after step 1: see [Step 1 result](#step-1-result-measured-oct-9-2026).
+**Built Oct 14 2026, as a neighbour rule rather than poses:** see
+[What was built: neighbours decide](#what-was-built-neighbours-decide-oct-14-2026). Poses (the
+proposal below) went on hold on Oct 9 after step 1 measured that they would change only 4% of
+contested draws; the neighbour rule settles 94% on the same game.
 
 Backlog #16 (and #14, mirrored poses, if the measurements say so). Planned Oct 9 2026 against
 *Mario's Tennis* (271 frames, 80 groups).
@@ -79,7 +82,7 @@ hold.** The cases worth fixing are list order, not poses: IntroMario ahead of Ma
 Luigi-PlayingAs ahead of DKjrOpp (the 15 draws are Luigi's own tiles). Revisit if a project has
 characters on screen together whose shared tiles sit in both characters' poses.
 
-## Steps (if resumed)
+## Steps (if resumed; superseded by the neighbour rule)
 
 1. **Measure first (½ day).** A probe over the pack: for every contested draw on every frame, is it
    in exactly one group's located pose — as captured, mirrored, or neither? This says how much the
@@ -101,3 +104,43 @@ use **Let … win** for the one-way cases (Luigi-PlayingAs over IntroMario and D
 Toad-PlayingAs over IntroMario, DonkeyKongJrText over LUIGI-text), and **Cover the whole map**
 for the backdrops that scroll past their pictures (Luigi-PlayingAs, DKjrCharacterSelect,
 MarioSelected, Toad-PlayingAs, SplashGraphic).
+
+## What was built: neighbours decide (Oct 14 2026)
+
+`src/shared-tile-owner.js`, used by `compositeColorFrame` and mirrored line for line in
+`native/core/src/colorizer.cpp` (`SharedTileOwners`). Instead of locating whole poses, a contested
+draw looks at the draws **beside it**:
+
+1. Same world and layer, 8 px left, right, up, down. On a scaled (affine) layer, the cells beside it
+   in the layer's map (`affineMapReader`), since the core's records of a zoomed tile are not on an
+   8 px grid. A neighbour votes for a contesting group when that group claims it and no other
+   contesting group does.
+2. Contested draws that touch settle together, in up to 8 rounds that each read only the last
+   round's results: a run of shared tiles is settled from its ends, and the answer does not depend
+   on which draw is asked first (the native player has to match it exactly). A cluster of more than
+   256 is left to the list order (a whole shared layer).
+3. No side votes: the corners vote the same way.
+4. One group voted: it colours the draw. None, or two that disagree: the list order, as before.
+
+Nothing is stored in the pack, so every existing pack gets it. The tools agree: *This pixel* says
+"wins because its own tiles are next to it" and offers no reorder there; `sharedTileWins` (the
+**behind …** label, *Shared tiles*, Check project) leaves out what the neighbours settle.
+
+**Measured** with a read-only probe over every captured frame (left eye):
+
+| Pack | Contested draws | Settled by neighbours | Winner changed |
+|---|---|---|---|
+| Mario's Tennis (489 frames) | 1,553 | 1,462 | 665 (150 frames change on screen) |
+| Mario Clash (158 frames) | 14,031 | 14,031 | 2,964 |
+
+In Mario's Tennis the changes are the far player's corner tile taking the near player's colours
+(Mario-PlayingAs, Yoshi-PlayingAs, LaikutoScore over DKjrOpp / MarioOpp), Toad-PlayingAs and
+Princess-PlayingAs over DKjrOpp, and words sharing letters (HARD / NORMAL / EASY, MATCH / SINGLES).
+What stays with the order: words both groups have whole (MatchText / SetMatch-Text), and
+KoopaBackground / LuigiCharacterSelect. In Mario Clash: the lower-right pipe takes its own group's
+paint instead of the upper one's, and a small platform's top its own colour.
+
+**Cost:** lazy, so a frame with nothing contested pays nothing. Mario's Tennis composite, both eyes:
+4.5 → 5.1 ms per frame in Node. **Parity:** Mario's Tennis 489 frames, 0 pixels different; Mario
+Clash 158 frames, 228 right-eye pixels different on 114 frames, the same with the rule switched off
+in both (a gap from before, not this rule).

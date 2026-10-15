@@ -14,7 +14,9 @@ import {
   buildGroupTileColorIndex,
   resolveGroupTileMatch,
   groupCriteriaSets,
+  frameTileOwners,
 } from './color-layer.js';
+import { affinePixelMap, affineWorlds } from './affine-world.js';
 import { getTileBytes, hashTile, isBlankTile } from './vip-state.js';
 import { recoverClippedBgDraws } from './vip-edge-tiles.js';
 import { stereoTwins } from './stereo-twin.js';
@@ -66,6 +68,26 @@ export function groupMiss(draw, group, hash) {
  *   details: null | { hash: number, tileIndex: number, layer: number, world: number | null, drawIndex: number, blank: boolean, eye: number },
  * }} PixelExplanation
  */
+
+/**
+ * The group whose paint the composite used for this draw: the neighbours' choice where groups paint
+ * the tile differently (src/shared-tile-owner.js), else the first in the list. On a scaled layer the
+ * pixel's map cell is the tile asked about.
+ * @returns {{ group: any, rgba: Uint8Array, byNeighbours?: true } | null}
+ */
+function groupThatColours(state, eye, shown, d, matchDraw, hash, x, y, matchWorld) {
+  const index = buildGroupTileColorIndex(shown);
+  const owners = frameTileOwners(state, index, eye, matchWorld || undefined);
+  let settled = null;
+  if (Number(d.layer ?? 0) === 1 && affineWorlds(state, eye).includes(d.world)) {
+    const px = affinePixelMap(state, eye).get(d.world);
+    const i = y * W + x;
+    if (px && px.mx[i] >= 0) settled = owners.ownerOfCell(d.world, (px.my[i] >> 3) * 1024 + (px.mx[i] >> 3), hash);
+  } else {
+    settled = owners.ownerOfDraw(d, hash);
+  }
+  return settled ? { ...settled, byNeighbours: true } : resolveGroupTileMatch(index, matchDraw, hash);
+}
 
 /**
  * @param {{
@@ -136,7 +158,7 @@ export function explainPixel(q) {
     });
   }
 
-  const match = resolveGroupTileMatch(buildGroupTileColorIndex(shown), matchDraw, hash);
+  const match = groupThatColours(state, eye, shown, d, matchDraw, hash, x, y, twin ? (w) => (w === d.world ? twin.left : w) : null);
   const override = !match && q.overrides?.length
     ? resolveOverrideRgba(q.overrides, hash, d.x, d.y, pack, d.layer, matchDraw, allGroups, q.gameStatePools ?? null, q.wram ?? null)
     : null;
@@ -153,7 +175,9 @@ export function explainPixel(q) {
     const why = [];
     const rivals = match ? members.filter((o) => o !== match.group && shown.includes(o) && paintsTile(o)) : [];
     if (rivals.length) {
-      why.push(`${rivals.map(groupLabel).join(', ')} also ${rivals.length === 1 ? 'paints' : 'paint'} this tile here; ${groupLabel(match.group)} wins because it comes first in the group list.`);
+      why.push(match.byNeighbours
+        ? `${rivals.map(groupLabel).join(', ')} also ${rivals.length === 1 ? 'paints' : 'paint'} this tile here; ${groupLabel(match.group)} wins because its own tiles are next to it.`
+        : `${rivals.map(groupLabel).join(', ')} also ${rivals.length === 1 ? 'paints' : 'paint'} this tile here; ${groupLabel(match.group)} wins because it comes first in the group list (nothing next to the tile shows whose it is).`);
     }
     if (match && shared) why.push('This tile also has shared paint (every copy of the pattern); the group’s own paint comes first.');
     if (!g && members.length) why.push(`It belongs to ${members.map(groupLabel).join(', ')}.`);
@@ -167,7 +191,8 @@ export function explainPixel(q) {
     const owning = g || members[0] || null;
     const extra = { details, why, fix: owning ? select(owning) : null, groupId: owning?.id ?? null };
     // The order decides it: offer to let the runner-up win (src/group-order.js moves it ahead).
-    if (rivals.length) {
+    // Not where the neighbours decided: the order does not change those.
+    if (rivals.length && !match.byNeighbours) {
       extra.reorder = { kind: 'move-before', groupId: rivals[0].id, beforeId: match.group.id, label: `Let ${groupLabel(rivals[0])} win` };
     }
     if (clearPixel) return result('uncoloured', `Not coloured: the tile is painted (by ${source}), but this pixel of it was left clear.`, extra);
