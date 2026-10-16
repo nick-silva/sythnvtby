@@ -1,6 +1,6 @@
 ---
 status: current
-last-reviewed: 2026-10-14
+last-reviewed: 2026-10-15
 covers: src/art-pack.js, src/frame-summary.js, src/group-schema.js, src/group-order.js, src/screen-gate.js, src/game-states.js, src/memory-questions.js, src/recovery.js, src/layer-art.js, src/touch-up.js, src/group-folders.js, src/transparent-paint.js, src/frame-cleanup.js, src/zip-read.js, src/zip-write.js, src/lazy-entries.js, src/pose-mirror.js
 ---
 
@@ -413,7 +413,9 @@ by `src/obj-sprite-profiles.js`; design in [obj-sprite-profiles-design.md](../de
   on a frame card). A background pose has the same shape as a sprite pose. A pose on a scaled
   (affine) layer has `"affine": true` and its `tiles` are just the patterns it shows, with no
   `dx`/`dy` or `anchorHash`, because a scaled layer has no fixed tile positions; it is drawn on its
-  `sourceFrameId` frame. Poses never change how the emulator colours anything; they only choose
+  `sourceFrameId` frame. When that frame does not show all of it, SpriteStudio looks for the frame
+  that shows the most and keeps it as `viewFrameId` (a `frameRegistry` id, written with the next
+  save), so it is not searched for again. Poses never change how the emulator colours anything; they only choose
   what SpriteStudio shows. Tracks stay sprite-only.
 
 ### 6.8 Related UX spec

@@ -207,7 +207,7 @@ function groupRow(g) {
     // Picking a group yourself counts as using it (the Project tool's New pose lists those first);
     // the selection a pack opens on does not.
     recordGroupUse(g.id);
-    ctx.selectGroup(g);
+    ctx.pickGroup(g);
   });
   btn.addEventListener('dragstart', (ev) => {
     ev.dataTransfer?.setData('text/x-group-id', g.id);

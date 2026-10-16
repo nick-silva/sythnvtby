@@ -729,6 +729,13 @@ export function affinePoseView(session, group, pose, eye = 0) {
   const crit = bgGroupCriteria(group);
   if (!crit || !Array.isArray(pose?.tiles)) return null;
   const want = pose.tiles.map((t) => t.hash >>> 0);
+  const done = (view, matched) => ({ ...view, matched, total: want.length, pose: { ...view.pose, poseId: pose.poseId, name: pose.name } });
+  // The frame found last time, saved with the pose: one frame to read instead of a search.
+  const remembered = pose.viewFrameId ? frameIndexForFrameId(session, pose.viewFrameId) : -1;
+  if (remembered >= 0) {
+    const hit = bgViewOnFrame(session, group, crit, remembered, eye);
+    if (hit?.view.pose.affineWorlds) return done(hit.view, want.filter((h) => hit.patterns.has(h)).length);
+  }
   const own = pose.sourceFrameId ? frameIndexForFrameId(session, pose.sourceFrameId) : -1;
   const order = [...(own >= 0 ? [own] : []), ...session.frames.map((_, i) => i).filter((i) => i !== own)];
   const wanted = new Set(want);
@@ -744,7 +751,17 @@ export function affinePoseView(session, group, pose, eye = 0) {
     if (matched === want.length) break;
   }
   if (!best) return null;
-  return { ...best.view, matched: best.matched, total: want.length, pose: { ...best.view.pose, poseId: pose.poseId, name: pose.name } };
+  // A search past the pose's own frame reads every captured frame (seconds for a big group): keep
+  // what it found on the pose, so the next look — and the pack, when next saved — goes straight
+  // there. Set in place on purpose: a remembered frame changes nothing you made, so finding it
+  // must not count as an unsaved change.
+  const found = best.view.frameIndex;
+  if (!(found === own && best.matched === want.length)) {
+    const f = session.frames[found];
+    const id = f ? String(f.registryEntry?.frameId || f.vipFile || '') : '';
+    if (id && pose.affine === true) pose.viewFrameId = id;
+  }
+  return done(best.view, best.matched);
 }
 
 /**
@@ -1207,6 +1224,17 @@ export function renderPoseLayer({ session, state, pose, origin, imageData, eye =
     const windows = getWindowsTableBytesFromState(state);
     const marks = getCompositePixelInfo().art;
     for (const entry of activeLayerArts({ ...state, windows }, poseGroups, eye)) paintLayerArt(imageData.data, null, windows, eye, entry, 1, marks);
+  } else if (poseGroups.length) {
+    // A Base tiles card (`__base:<pose>`) shows its own scaled pose's picture, cell by cell — never
+    // another pose's, whose patterns its cells may also hold.
+    const poseId = typeof pose?.poseId === 'string' && pose.poseId.startsWith('__base:') ? pose.poseId.slice('__base:'.length) : null;
+    const own = new Set((group.poseOverpaints || []).filter((p) => p?.poseId === poseId).map((p) => p.id));
+    const marks = getCompositePixelInfo().art;
+    for (const g of poseGroups) {
+      if (!own.has(g.posePictureId)) continue;
+      const px = layerArtPixels(g);
+      if (px) paintOverpaintOnCells(imageData.data, draws, layerArtOf(g), px, eye, marks);
+    }
   }
   if (group?.touchUp) {
     const windows = getWindowsTableBytesFromState(state);

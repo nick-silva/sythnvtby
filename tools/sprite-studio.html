@@ -493,6 +493,47 @@
       text-overflow: ellipsis;
     }
     .empty { color: var(--muted); font-size: 0.72rem; }
+    /* Busy: shown while a big scaled group's cards are built (sprite-studio.js whileBusy). Both
+       animations are transform/opacity, which keep running while the page is busy; the fade-in
+       waits a moment so a quick load never flashes it. */
+    #busy {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      animation: busy-in 0.15s ease-out 0.12s forwards;
+    }
+    #busy[hidden] { display: none; }
+    .busy-box {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      background: var(--surface-2);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+    .busy-spinner {
+      width: 1.1rem;
+      height: 1.1rem;
+      border: 2px solid var(--border-strong);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      will-change: transform;
+      animation: busy-spin 0.8s linear infinite;
+    }
+    @keyframes busy-spin { to { transform: rotate(360deg); } }
+    @keyframes busy-in { to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      .busy-spinner { animation-duration: 2.4s; }
+    }
     /* Save progress — same window as the Project tool (tools/shared/save-progress-ui.js). */
     #save-progress-dialog,
     #clear-paint-dialog {
@@ -672,7 +713,7 @@
         <label id="original-alpha-label" title="Original picture opacity: low to see it through your paint, full to compare by switching it on and off">Opacity <input type="range" id="original-alpha" min="0.05" max="1" step="0.05" value="0.5" aria-label="Original picture opacity" /></label>
         <label title="Tiles with no paint show in red, as in the Project tool (the game shows them as the original picture). Pixels of painted tiles still on a starting grey are tinted red: the game shows that grey. Hover one to see which."><input type="checkbox" id="toggle-unpainted" checked /> Show unpainted</label>
         <label title="While you paint a group, show only its own paint on its tiles — not colours another group (or the shared pack) gives the same tile patterns in the game. Unpainted tiles look unpainted. Turn off to see what the game shows."><input type="checkbox" id="toggle-own-paint" checked /> Only this group's paint</label>
-        <label id="base-tiles-label" hidden title="A scaled (affine) group: show its tiles unscaled, as they sit in the game's background map, and paint them there. Paint is per tile pattern, so every scaled copy follows."><input type="checkbox" id="toggle-base-tiles" /> Base tiles</label>
+        <label id="show-scaled-label" hidden title="A scaled (affine) group's cards show its base tiles: unscaled, as they sit in the game's background map, where you paint them. Tick to see each pose scaled, as on the frame it was captured from."><input type="checkbox" id="toggle-show-scaled" /> Show scaled</label>
         <label title="Colour behind the sprite where the scene is not drawn — a loud colour makes dark sprite edges obvious">Behind
           <input type="color" id="stage-bg-color" value="#ff00aa" />
         </label>
@@ -791,6 +832,7 @@
   </div>
 
   <div class="statusbar" id="status">Ready.</div>
+  <div id="busy" role="status" aria-live="polite" hidden><div class="busy-box"><span class="busy-spinner" aria-hidden="true"></span><span id="busy-text">Loading…</span></div></div>
 
   <dialog id="save-progress-dialog" aria-labelledby="save-progress-title">
     <form id="save-progress-form" method="dialog">

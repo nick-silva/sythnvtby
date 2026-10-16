@@ -103,6 +103,8 @@ export function normalizePose(raw) {
     ...(sourceFrameId && { sourceFrameId }),
     // A pose on a scaled (affine) layer: its tiles are the patterns it shows, with no offsets.
     ...(raw.affine === true && { affine: true }),
+    // The frame its card is shown on, remembered once found (tools/shared/pack-session.js affinePoseView).
+    ...(raw.affine === true && nonEmptyString(raw.viewFrameId) && { viewFrameId: nonEmptyString(raw.viewFrameId) }),
   };
 }
 

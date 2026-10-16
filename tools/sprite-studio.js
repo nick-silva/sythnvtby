@@ -352,6 +352,42 @@ function setStatus(msg) {
   el('status').textContent = msg;
 }
 
+/** Poses at which a group's cards take long enough to build that picking it shows the spinner. */
+const BUSY_POSES = 40;
+let busyCount = 0;
+
+/**
+ * Show the busy spinner, let it paint, then run `fn`: building a big scaled group's cards blocks
+ * the page for a moment, and this says it is working, not stuck. The spinner keeps turning while
+ * `fn` runs (its animation is off the main thread) and fades in late, so a quick one never shows.
+ * @param {string} label @param {() => void} fn
+ */
+function whileBusy(label, fn) {
+  el('busy-text').textContent = label;
+  el('busy').hidden = false;
+  busyCount++;
+  requestAnimationFrame(() =>
+    setTimeout(() => {
+      try {
+        fn();
+      } finally {
+        if (--busyCount === 0) el('busy').hidden = true;
+      }
+    }, 0),
+  );
+}
+
+/** Select a group you picked: with the spinner when its cards are slow to build (scaled poses, or many). */
+function pickGroup(group) {
+  const poses = Array.isArray(group?.poses) ? group.poses : [];
+  const slow = poses.some((p) => p?.affine) || poses.length >= BUSY_POSES;
+  if (!slow || group.id === selectedGroup?.id) {
+    selectGroup(group);
+    return;
+  }
+  whileBusy(`Loading ${poses.length} poses of ${group.name || group.id}…`, () => selectGroup(group));
+}
+
 function eye() {
   return Number(el('eye-select').value) === 1 ? 1 : 0;
 }
@@ -481,6 +517,7 @@ async function openViaPicker() {
 initGroupList({
   get el() { return el; },
   markDirty,
+  pickGroup,
   renderDetail,
   get selectedGroup() { return selectedGroup; },
   set selectedGroup(v) { selectedGroup = v; },
@@ -729,6 +766,7 @@ initPick({
   get el() { return el; },
   eye,
   markDirty,
+  pickGroup,
   get poseIndex() { return poseIndex; },
   get poseViews() { return poseViews; },
   get selectedGroup() { return selectedGroup; },
@@ -1678,8 +1716,11 @@ el('toggle-unpainted').addEventListener('change', () => {
   renderStrip();
   renderDetail();
 });
-// Base tiles swaps a scaled group's cards for their unscaled tiles, staying on the same card.
-el('toggle-base-tiles').addEventListener('change', applyBaseTilesToggle);
+// Show scaled swaps a scaled group's base-tiles cards for the poses as the game drew them, staying on the same card.
+el('toggle-show-scaled').addEventListener('change', () => {
+  const n = poseViews.length;
+  whileBusy(`${el('toggle-show-scaled').checked ? 'Loading scaled cards for' : 'Building base tiles for'} ${n} pose${n === 1 ? '' : 's'}…`, applyBaseTilesToggle);
+});
 function applyBaseTilesToggle() {
   if (!selectedGroup || !session) return;
   stopPlayback();
@@ -1700,11 +1741,11 @@ function applyBaseTilesToggle() {
   renderDetail();
   const v = poseViews[poseIndex];
   setStatus(
-    el('toggle-base-tiles').checked
-      ? v?.base
+    el('toggle-show-scaled').checked
+      ? 'Showing each pose scaled, as on the frame it was captured from.'
+      : v?.base
         ? `Base tiles: ${v.matched} tile(s) as they sit in the game's map, unscaled. Paint here colours every scaled copy.`
-        : 'This card has no base tiles to show.'
-      : 'Showing the scaled cards again.',
+        : 'This card has no base tiles to show.',
   );
 }
 try {

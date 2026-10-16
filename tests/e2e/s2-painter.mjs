@@ -1348,7 +1348,7 @@ await s.test('Affine (zooming) frame: click selects the scaled tile, groups find
   return `${found.frame.slice(0, 40)} · ${after - before} px green from one dab`;
 });
 
-await s.test('SpriteStudio Base tiles: a scaled group shows its tiles unscaled, and paint there lands', async () => {
+await s.test('SpriteStudio base tiles: a scaled group opens on its tiles unscaled, and paint there lands', async () => {
   if (!affinePackForStudio) return 'skipped — the affine test above did not make a group';
   const studio = await context.newPage();
   const { errors: studioErrors } = instrument(studio);
@@ -1357,16 +1357,15 @@ await s.test('SpriteStudio Base tiles: a scaled group shows its tiles unscaled, 
   await studio.waitForFunction(() => document.querySelectorAll('.sprite-row').length > 0, null, { timeout: 90000 });
   await studio.click('.sprite-row:has-text("Reg affine")');
   await studio.waitForTimeout(600);
-  const offered = await studio.isVisible('#toggle-base-tiles');
+  const offered = await studio.isVisible('#toggle-show-scaled');
+  const opensOnBase = !(await studio.isChecked('#toggle-show-scaled'));
   const poseActions = () => studio.evaluate(() => !!document.getElementById('btn-pose-rename') && !!document.getElementById('pose-move-select'));
   const actionsBefore = await poseActions();
   await studio.uncheck('#toggle-outline');
-  await studio.check('#toggle-base-tiles');
-  await studio.waitForTimeout(600);
   const note = (await studio.textContent('#stage-note')) || '';
   const label = (await studio.textContent('.pose-card.active .label')) || '';
   // A base-tiles card stands in for its stored pose: Rename and Move still act on that pose.
-  expect(!actionsBefore || (await poseActions()), `“${label}” lost Rename/Move with Base tiles on`);
+  expect(!actionsBefore || (await poseActions()), `“${label}” lost Rename/Move on its base tiles`);
   const stagePixels = (want) => studio.evaluate((want) => {
     const c = /** @type {HTMLCanvasElement} */ (document.getElementById('stage-canvas'));
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
@@ -1396,14 +1395,14 @@ await s.test('SpriteStudio Base tiles: a scaled group shows its tiles unscaled, 
   if (hit) await studio.mouse.click(box.x + hit.u * box.w + 2, box.y + hit.v * box.h + 2);
   await studio.waitForTimeout(400);
   const blueAfter = await stagePixels('blue');
-  // Overpaint on a scaled card is painted through the scaling — no Base tiles needed — and the
-  // same stroke shows on the base tiles, where it lies in the layer's map.
-  await studio.uncheck('#toggle-base-tiles');
+  // Overpaint on a scaled card is painted through the scaling — Show scaled on — and the same
+  // stroke shows on the base tiles, where it lies in the layer's map.
+  await studio.check('#toggle-show-scaled');
   await studio.waitForTimeout(400);
   await studio.click('#btn-paint-touchup');
   await studio.waitForTimeout(600);
   const overpaintMode = await studio.$eval('#btn-paint-touchup', (b) => b.classList.contains('active'));
-  const baseStayedOff = !(await studio.isChecked('#toggle-base-tiles'));
+  const scaledStayedOn = await studio.isChecked('#toggle-show-scaled');
   const ORANGE = [255, 128, 0];
   const countOrange = () => studio.evaluate((c) => {
     const cv = /** @type {HTMLCanvasElement} */ (document.getElementById('stage-canvas'));
@@ -1435,13 +1434,13 @@ await s.test('SpriteStudio Base tiles: a scaled group shows its tiles unscaled, 
   await studio.waitForTimeout(400);
   const orangeScaled = await countOrange();
   const strokeNote = (await studio.textContent('#status')) || '';
-  await studio.check('#toggle-base-tiles');
+  await studio.uncheck('#toggle-show-scaled');
   await studio.waitForTimeout(700);
   const orangeOnBase = await countOrange();
-  expect(overpaintMode && baseStayedOff, `Overpaint on a scaled card: mode ${overpaintMode}, Base tiles left off ${baseStayedOff}`);
+  expect(overpaintMode && scaledStayedOn, `Overpaint on a scaled card: mode ${overpaintMode}, Show scaled left on ${scaledStayedOn}`);
   expect(orangeScaled > 0 && /Painted the overpaint/.test(strokeNote), `the stroke did not land through the scaling (${orangeScaled} px) · ${strokeNote.slice(0, 100)}`);
   expect(orangeOnBase > 0, 'the overpaint stroke does not show on the base tiles');
-  expect(offered, 'no Base tiles toggle for a scaled group');
+  expect(offered && opensOnBase, `scaled group: Show scaled offered ${offered}, opens on base tiles ${opensOnBase}`);
   expect(/base tiles/.test(note) && /base tiles/.test(label), `stage note "${note}", card "${label}"`);
   expect(tilePixels > 0 && hit, 'the base tile drew nothing to click');
   expect(blueAfter > blueBefore, `Fill on a base tile painted nothing (${blueBefore} → ${blueAfter} blue px)`);

@@ -78,10 +78,23 @@ const SCALED_MARGIN = 16;
  * keyed posePictureKey(group, pose) — and the picture store writes it back where it belongs.
  */
 
+/** A Base tiles card's pose id: this prefix and the scaled pose it shows (tools/shared/pack-session.js affineBaseView). */
+const BASE_TILES_PREFIX = '__base:';
+
+/**
+ * The saved pose a card shows, or undefined for a card that is a captured frame. A Base tiles card
+ * stands for the scaled pose behind it, so painting there paints that pose, not every pose.
+ */
+function savedPoseOfView(view) {
+  const id = view?.pose?.poseId;
+  if (typeof id !== 'string' || !ctx.selectedGroup) return undefined;
+  const bare = id.startsWith(BASE_TILES_PREFIX) ? id.slice(BASE_TILES_PREFIX.length) : id;
+  return posesOf(ctx.selectedGroup).find((p) => p.poseId === bare);
+}
+
 /** The saved pose the card on stage shows, or undefined for a card that is a captured frame. */
 function stageSavedPoseId() {
-  const id = ctx.poseViews[ctx.poseIndex]?.pose?.poseId;
-  return ctx.selectedGroup && posesOf(ctx.selectedGroup).some((p) => p.poseId === id) ? id : undefined;
+  return savedPoseOfView(ctx.poseViews[ctx.poseIndex])?.poseId;
 }
 
 /** The selected group's pose picture for the card on stage, or null. */
@@ -514,7 +527,7 @@ function createOverpaint({ pose = false } = {}) {
     }
     const pictureId = newPosePictureId(group);
     const key = posePictureKey(group.id, pictureId);
-    const name = view?.pose?.name || `Frame ${(view?.frameIndex ?? 0) + 1}`;
+    const name = savedPoseOfView(view)?.name || view?.pose?.name || `Frame ${(view?.frameIndex ?? 0) + 1}`;
     pushPictureUndo(key);
     // Tied to the saved pose on stage, when it is one: the picture follows that pose's tiles.
     pictureStore.put(key, { ...start, hashes, name, poseId: stageSavedPoseId() }, { width: 1, height: 1, data: new Uint8ClampedArray(4) });
@@ -685,8 +698,11 @@ export function stagePosePatterns() {
 
 /** The selected group's patterns a card shows (any card of the filmstrip). */
 export function viewPosePatterns(view) {
-  if (!view || view.base || !ctx.selectedGroup) return [];
-  const shown = Array.isArray(view.patterns) ? view.patterns : (view.pose?.tiles || []).map((t) => t.hash);
+  if (!view || !ctx.selectedGroup) return [];
+  // A Base tiles card shows a scaled pose's cells unscaled: its patterns are that pose's.
+  const saved = view.base ? savedPoseOfView(view) : null;
+  if (view.base && !saved) return [];
+  const shown = saved ? saved.tiles.map((t) => t.hash) : Array.isArray(view.patterns) ? view.patterns : (view.pose?.tiles || []).map((t) => t.hash);
   const own = new Set((ctx.selectedGroup.criteria?.hashes || []).map((h) => Number(h) >>> 0));
   return [...new Set(shown.map((h) => Number(h) >>> 0))].filter((h) => !own.size || own.has(h));
 }
@@ -695,8 +711,7 @@ export function viewPosePatterns(view) {
 export function posePictureForView(view) {
   const group = ctx.selectedGroup;
   if (!group || isObjGroup(group) || group.wholePose === true || !Array.isArray(group.poseOverpaints) || !group.poseOverpaints.length) return null;
-  const poseId = posesOf(group).some((p) => p.poseId === view?.pose?.poseId) ? view.pose.poseId : undefined;
-  return posePictureFor(group, viewPosePatterns(view), poseId);
+  return posePictureFor(group, viewPosePatterns(view), savedPoseOfView(view)?.poseId);
 }
 
 /** "1,234 px painted" for a picture, from its pixels. */
@@ -794,7 +809,7 @@ export function overpaintThisPose(move) {
   const art = layerArtOf(group);
   const px = art ? layerArtPixels(group) : null;
   if (!art || !px || !group.overpaint) return;
-  const name = view.pose?.name || `Frame ${view.frameIndex + 1}`;
+  const name = savedPoseOfView(view)?.name || view.pose?.name || `Frame ${view.frameIndex + 1}`;
   if (!window.confirm(`Move “${group.name || group.id}”’s overpaint to the pose “${name}”?\n\nIt will show only when all ${hashes.length} tiles of this pose are on screen, not on the group’s other poses. Undo puts it back; nothing is written until you save.`)) return;
   ctx.stopPlayback();
   const pictureId = newPosePictureId(group);

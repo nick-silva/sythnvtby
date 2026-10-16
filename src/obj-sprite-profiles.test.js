@@ -159,6 +159,14 @@ describe('normalizeObjProfileFields', () => {
     expect(out.poses[0].affine).toBeUndefined();
   });
 
+  it('keeps the frame a scaled pose is shown on, and only for a scaled pose', () => {
+    const affine = { poseId: 'pose_2', name: 'Swing', affine: true, viewFrameId: 'f-abc', tiles: [{ hash: H1 }] };
+    const plain = { ...macroPose(), viewFrameId: 'f-abc' };
+    const out = normalizeObjProfileFields({ authoringKind: 'bg', poses: [plain, affine] });
+    expect(out.poses[1].viewFrameId).toBe('f-abc');
+    expect(out.poses[0].viewFrameId).toBeUndefined();
+  });
+
   it('returns nothing for an OBJ group without valid poses', () => {
     expect(normalizeObjProfileFields({ authoringKind: 'obj', poses: [{ tiles: [] }] })).toEqual({});
   });

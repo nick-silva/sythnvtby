@@ -31,7 +31,7 @@ export function initPoses(context) {
 
 /** Resolve each pose to a frame and an anchor position in that frame. */
 export function buildPoseViews(group) {
-  ctx.el('base-tiles-label').hidden = true;
+  ctx.el('show-scaled-label').hidden = true;
   if (!isObjGroup(group)) {
     // An animated group gets one card per phase of its animation, like a sprite's poses.
     if (isAnimatedGroup(group)) {
@@ -45,10 +45,10 @@ export function buildPoseViews(group) {
     const views = kept.length
       ? kept.map((pose) => (pose.affine ? affinePoseView(ctx.session, group, pose, ctx.eye()) : locatedPoseView(pose))).filter(Boolean)
       : bgGroupViews(ctx.session, group, ctx.eye());
-    // Base tiles: a scaled card shows its tiles unscaled instead (src/affine-base.js).
+    // A scaled card shows its base tiles, unscaled (src/affine-base.js), unless Show scaled is on.
     const scaled = views.some((v) => v.pose.affineWorlds);
-    ctx.el('base-tiles-label').hidden = !scaled;
-    const shown = scaled && ctx.el('toggle-base-tiles').checked ? views.map((v) => (v.pose.affineWorlds && affineBaseView(ctx.session, v, ctx.eye())) || v) : views;
+    ctx.el('show-scaled-label').hidden = !scaled;
+    const shown = scaled && !ctx.el('toggle-show-scaled').checked ? views.map((v) => (v.pose.affineWorlds && affineBaseView(ctx.session, v, ctx.eye())) || v) : views;
     return shown.map((v) => ({ ...v, set: v.pose.affineWorlds || v.base || !v.origin ? null : findRepeatSet(v.pose.tiles) }));
   }
   // A sprite group with no poses yet (made from a tile selection) would only have its tile list,
@@ -184,7 +184,7 @@ export function isDeletablePose(pose) {
 const BASE_TILES_VIEW_PREFIX = '__base:';
 
 /**
- * The stored pose a filmstrip card stands for. With Base tiles on, a scaled pose's card is a
+ * The stored pose a filmstrip card stands for. Unless Show scaled is on, a scaled pose's card is a
  * stand-in (src/affine-base.js) — Rename, Delete and Move still act on the pose behind it.
  */
 export function storedPose(pose) {

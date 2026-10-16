@@ -9,7 +9,6 @@ import { withWorlds } from '../../src/group-worlds.js';
 import { frameState, frameWram, poseDraws, renderFrame, poseBounds, FRAME_W, FRAME_H } from '../shared/pack-session.js';
 import { showTouchUps } from './overpaint.js';
 import { renderSpriteLists } from './group-list.js';
-import { selectGroup } from './poses.js';
 import { drawStage, invalidateRender } from './render.js';
 
 /** SpriteStudio's state and functions this part uses (tools/sprite-studio.js passes them in). */
@@ -104,5 +103,5 @@ function applyExplainFix(fix) {
     ctx.setStatus(`“${g.name || g.id}” now paints on world ${fix.world} too — save to keep it.`);
     return;
   }
-  selectGroup(g);
+  ctx.pickGroup(g);
 }

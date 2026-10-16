@@ -765,12 +765,18 @@ its edges. It's the nicest place to paint characters.
     while you work; unpainted tiles look unpainted. Untick it to see what the game shows, where a
     shared tile takes the colours of the group whose tiles are next to it, or of the group listed
     first (among those allowed on the screen) where nothing next to it tells.
-  - **Base tiles** (scaled groups only, like the far player in Mario's Tennis): shows the group's
-    tiles unscaled, as they sit in the game's background map, instead of zoomed by the game.
-    Paint them there with any tool; paint is per tile pattern, so every scaled copy on every frame
-    follows. Each card shows the drawing that card's frame used. Untick it to check the result scaled.
-    **Overpaint** shows here too, laid out in the game's map: paint it on Base tiles or on the
-    zoomed card, whichever is easier. Switching Base tiles keeps you on the same frame.
+  - **Show scaled** (scaled groups only, like the far player in Mario's Tennis): a scaled group's
+    cards open on its **base tiles** — its tiles unscaled, as they sit in the game's background
+    map. Paint them there with any tool; paint is per tile pattern, so every scaled copy on every
+    frame follows. Each card shows the drawing that card's frame used. Tick Show scaled to see
+    each pose zoomed, as on the frame it was captured from. **Overpaint** shows on both, laid out
+    in the game's map: paint it on whichever is easier. On a saved pose's base tiles it paints that
+    pose's own picture, as the zoomed card does, and the card shows only that pose's picture (plus
+    the group's all-poses picture, if it has one). Switching keeps you on the same frame. Base
+    tiles are not a real frame, so **Background** shows nothing behind them; tick Show scaled for
+    the scene, or to judge an animation or onion skin at game size. A big scaled group takes a few
+    seconds to open the first time; it remembers each pose's frame (saved with the pack), so later
+    opens are quick.
   - **Brightness** (header) brightens unpainted tiles only. At 1, unpainted tiles show in the same
     greys a tile's paint starts from (the shades the game's palette shows them in), so the first
     stroke on a tile changes only the pixel you paint.
@@ -884,8 +890,8 @@ To paint it:
    where the picture you see changes: overpaint, the tile paint under it, and the scene when
    **Background** is on. Turn Background off to fill across the scene.
 5. **Scaled (affine) layers:** paint the card as it is, zoomed — strokes go through the zoom and
-   land in the layer's map. **Base tiles** shows the same picture on the unscaled tiles; paint
-   whichever is easier.
+   land in the layer's map. The base tiles (Show scaled off, the default) show the same picture
+   on the unscaled tiles; paint whichever is easier.
 6. **Import image… / Paste / Ctrl+V / Copy / Export PNG** work on the whole picture. **Clear**
    erases it, **Remove** drops it (Undo brings either back).
 7. Press **T** or click **Tiles** to go back to tile paint. Selecting another group always goes
@@ -990,9 +996,9 @@ intro. The Virtual Boy calls these **affine** layers, and the tile inspector sho
   which makes careful painting easier.
 - **One group covers both.** A background group made while the layer was still normal covers it
   when it starts zooming, and the other way round.
-- **In SpriteStudio** a scaled group's cards show it through the game's scaling, and **Base
-  tiles** shows its tiles unscaled to paint them directly. Overpaint on a scaled group is painted
-  on the zoomed card or on Base tiles, and drawn scaled in the emulator, both tools and the player.
+- **In SpriteStudio** a scaled group's cards show its base tiles, unscaled, to paint them
+  directly; **Show scaled** shows them through the game's scaling. Overpaint on a scaled group is
+  painted on either, and drawn scaled in the emulator, both tools and the player.
 - **Not yet:** **Hide the tiles under it** doesn't apply on affine layers (the picture is drawn
   over the tiles).
 
@@ -1036,7 +1042,7 @@ across all its tiles and poses at once, including copies you can't see on this f
    repaint them. **Remove…** takes them out of the group with their paint, and lists the frames
    they show on.
 
-   **Rename…** (or **F2**) in Pose details renames the pose (with **Base tiles** on, a scaled
+   **Rename…** (or **F2**) in Pose details renames the pose (a scaled
    pose's "· base tiles" card renames, deletes and moves that pose). **Move to** sends it to another
    group of the same kind (sprite or background); affine and flat poses can share a group. The
    tile patterns only that pose used
