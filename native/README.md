@@ -6,7 +6,7 @@ day, Switch. Design: [docs/design/vb-color-player.md](../docs/design/vb-color-pl
 
 | Folder | Target | What it is |
 |---|---|---|
-| `core/` | `vbcolor_core` | Portable library: no platform, window or emulator code. The `Emulator` interface, the VIP frame data, stereo layout (2D / side-by-side / anaglyph), the **play-pack reader** (`play_pack.hpp`) and the **colour layer** (`colorizer.hpp`), a port of the browser's `compositeColorFrame` checked pixel for pixel against it. |
+| `core/` | `vbcolor_core` | Portable library: no platform, window or emulator code. The `Emulator` interface, the VIP frame data, stereo layout (2D / side-by-side / anaglyph), the **play-pack reader** (`play_pack.hpp`), **finding a ROM's pack** (`pack_finder.hpp`) and the **colour layer** (`colorizer.hpp`), a port of the browser's `compositeColorFrame` checked pixel for pixel against it. |
 | `beetle/` | `vbcolor_beetle` | `create_beetle_emulator()`: Beetle VB, statically linked, behind `vbc::Emulator`. |
 | `cmake/BeetleVB.cmake` | `beetle_vb` | Fetches Beetle at the commit our patches target and applies `../patches` (the same VIP export patches the browser build uses), switched to a C callback (`PatchBeetleNative.cmake`). |
 | `player-sdl/` | `vbcolor-player` | The PC player: window, keyboard and controller, audio, battery saves, save states, and the colour from a play pack. |
@@ -27,11 +27,30 @@ the first configure.
 ```
 cmake -S native -B native/build -G "Visual Studio 17 2022" -A x64
 cmake --build native/build --config Release
-native\build\player-sdl\Release\vbcolor-player.exe "path\to\game.vb" --pack "path\to\game.vbcplay"
+native\build\player-sdl\Release\vbcolor-player.exe "path\to\game.vb"
 ```
 
-A play pack comes from the Project tool's **File ▸ Export for player…**. Without one the game plays
-in monochrome.
+A play pack comes from the Project tool's **File ▸ Export for player…**. It never holds the ROM:
+the player is given the ROM and finds the pack for it (below). Without one the game plays in
+monochrome. `--pack game.vbcplay` uses that pack for this session instead (not remembered).
+
+### Finding the colour pack
+
+When a game starts, the player looks for its pack in this order (`core/src/pack_finder.cpp`):
+
+1. **Your choice for this ROM**, if you made one: a pack you dropped on the window or picked with
+   **Ctrl+O**, or **no colour** (Shift+F10). Kept per ROM (by SHA-1) in
+   `%APPDATA%\VBColor\Player\pack-choices.json`.
+2. **Beside the game**: `Game.vbcplay` next to `Game.vb`, if it was made for this ROM.
+3. **A packs folder**: any `.vbcplay` made for this ROM, whatever its name, matched by the ROM's
+   SHA-1 (CRC32 and size for packs that only record those). If several match, the newest
+   (`createdAt`) wins. Folders searched: each `--packs-dir`, a `packs` folder beside the player,
+   and `%APPDATA%\VBColor\Player\packs\` (made on first run). Each keeps an `index.json`, so packs
+   are only opened again when they change.
+
+A chosen pack that has been moved or deleted is reported, and the search carries on. A pack beside
+the game that was made for another ROM is skipped with a note. The title bar says where the pack
+came from.
 
 Tests (`VBC_TEST_ROM` adds the Beetle smoke test):
 
@@ -88,6 +107,9 @@ so far uses them; the player says so when a pack does).
 | Key | Does |
 |---|---|
 | F9 | Colour / monochrome (with a play pack) |
+| Ctrl+O | Choose a play pack for this game (remembered) |
+| F10 | Forget the choice: find the pack by itself again |
+| Shift+F10 | Play this game without colour (remembered) |
 | V | View: 2D → Side-by-side → Anaglyph |
 | F11, Alt+Enter | Full screen (Esc leaves it) |
 | P | Pause |
@@ -95,6 +117,7 @@ so far uses them; the player says so when a pack does).
 | Ctrl+R | Reset |
 | Esc | Quit |
 
-Or drop a ROM and a play pack (`.vbcplay`) on the window. A ROM the pack was not made for gets a
-warning; the colours may land on the wrong tiles. Battery saves and save states are kept per game in
+Or drop a ROM on the window; dropping a play pack (`.vbcplay`) chooses it for the game that is
+running (or, before any game, for the next one). A ROM the pack was not made for gets a warning;
+the colours may land on the wrong tiles. Battery saves and save states are kept per game in
 `%APPDATA%\VBColor\Player\`.

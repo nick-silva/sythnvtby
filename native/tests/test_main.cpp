@@ -3,17 +3,23 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
 #include <vector>
 
+#include "miniz.h"
 #include "vbcolor/beetle.hpp"
+#include "vbcolor/pack_finder.hpp"
 #include "vbcolor/play_pack.hpp"
 #include "vbcolor/rom_identity.hpp"
 #include "vbcolor/stereo.hpp"
 #include "vbcolor/vip_frame.hpp"
+
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -184,6 +190,78 @@ void test_group_screens() {
   CHECK(vbc::group_shown_on_screen(groups[2], game.data(), 16));
 }
 
+/** A minimal .vbcplay (only play.json) made for a ROM with this SHA-1, written to `path`. */
+void write_test_pack(const fs::path& path, const std::string& sha1, const std::string& created_at, const std::string& title) {
+  const std::string info = R"({"format":"vbcolor-play","version":1,"title":")" + title + R"(","createdAt":")" + created_at +
+                           R"(","rom":{"fileName":"game.vb","size":3,"sha1":")" + sha1 + R"(","crc32":""}})";
+  mz_zip_archive zip;
+  std::memset(&zip, 0, sizeof zip);
+  void* buf = nullptr;
+  size_t size = 0;
+  bool ok = mz_zip_writer_init_heap(&zip, 0, 0) && mz_zip_writer_add_mem(&zip, "play.json", info.data(), info.size(), MZ_DEFAULT_COMPRESSION) &&
+            mz_zip_writer_finalize_heap_archive(&zip, &buf, &size);
+  std::ofstream out(path, std::ios::binary);
+  if (ok) out.write(static_cast<const char*>(buf), static_cast<std::streamsize>(size));
+  mz_zip_writer_end(&zip);
+  if (buf) mz_free(buf);
+  CHECK(ok && out.good());
+}
+
+/** Choices first, then beside the game, then the packs folders by SHA-1 (newest wins). */
+void test_pack_finder() {
+  const fs::path root = fs::temp_directory_path() / ("vbc-pack-finder-" + std::to_string(std::rand()));
+  std::error_code ec;
+  fs::remove_all(root, ec);
+  fs::create_directories(root / "games");
+  fs::create_directories(root / "packs");
+  const std::string abc = "abc";
+  const vbc::RomIdentity rom = vbc::rom_identity(std::vector<uint8_t>(abc.begin(), abc.end()));
+  const std::string other = std::string(40, '1');
+  const fs::path rom_path = root / "games" / "game.vb";
+  vbc::PackChoices choices(root / "choices.json");
+
+  CHECK(vbc::find_play_pack(rom_path, rom, {root / "packs"}, choices).source == vbc::PackSource::None);
+
+  // Packs folder: any name, matched by SHA-1; the newest wins; another game's pack is ignored.
+  write_test_pack(root / "packs" / "older.vbcplay", rom.sha1, "2026-01-01T00:00:00.000Z", "Old");
+  write_test_pack(root / "packs" / "newer.vbcplay", rom.sha1, "2026-06-01T00:00:00.000Z", "New");
+  write_test_pack(root / "packs" / "zzz-other.vbcplay", other, "2027-01-01T00:00:00.000Z", "Other");
+  auto found = vbc::find_play_pack(rom_path, rom, {root / "missing", root / "packs"}, choices);
+  CHECK(found.source == vbc::PackSource::PacksFolder && found.path.filename() == "newer.vbcplay");
+  CHECK(fs::exists(root / "packs" / "index.json"));
+  CHECK(vbc::index_packs_folder(root / "packs").size() == 3);  // from the index this time
+
+  // Beside the game beats the packs folder, but only when it is made for this ROM.
+  write_test_pack(root / "games" / "game.vbcplay", other, "2026-01-01T00:00:00.000Z", "Wrong");
+  found = vbc::find_play_pack(rom_path, rom, {root / "packs"}, choices);
+  CHECK(found.source == vbc::PackSource::PacksFolder && found.notes.size() == 1);
+  write_test_pack(root / "games" / "game.vbcplay", rom.sha1, "2025-01-01T00:00:00.000Z", "Beside");
+  found = vbc::find_play_pack(rom_path, rom, {root / "packs"}, choices);
+  CHECK(found.source == vbc::PackSource::BesideGame && found.notes.empty());
+
+  // The player's choice beats both, is remembered across runs, and can be no colour at all.
+  CHECK(choices.choose_pack(rom.sha1, root / "packs" / "older.vbcplay"));
+  found = vbc::find_play_pack(rom_path, rom, {root / "packs"}, vbc::PackChoices(root / "choices.json"));
+  CHECK(found.source == vbc::PackSource::Choice && found.path.filename() == "older.vbcplay");
+  CHECK(choices.choose_none(rom.sha1));
+  found = vbc::find_play_pack(rom_path, rom, {root / "packs"}, vbc::PackChoices(root / "choices.json"));
+  CHECK(found.source == vbc::PackSource::None && found.chose_none);
+  CHECK(choices.forget(rom.sha1));
+  CHECK(vbc::find_play_pack(rom_path, rom, {root / "packs"}, vbc::PackChoices(root / "choices.json")).source == vbc::PackSource::BesideGame);
+
+  // A chosen pack that has gone: say so and look again.
+  CHECK(choices.choose_pack(rom.sha1, root / "gone.vbcplay"));
+  found = vbc::find_play_pack(rom_path, rom, {root / "packs"}, choices);
+  CHECK(found.source == vbc::PackSource::BesideGame && found.notes.size() == 1);
+
+  // A pack removed from the folder drops out of the index; a damaged choices file reads as none.
+  fs::remove(root / "packs" / "newer.vbcplay");
+  CHECK(vbc::index_packs_folder(root / "packs").size() == 2);
+  std::ofstream(root / "choices.json") << "{not json";
+  CHECK(!vbc::PackChoices(root / "choices.json").get(rom.sha1));
+  fs::remove_all(root, ec);
+}
+
 /** Boot a real game for a few seconds: both eyes come out, and the VIP's data with them. */
 void test_beetle_smoke() {
   const char* path = std::getenv("VBC_TEST_ROM");
@@ -237,6 +315,7 @@ int main() {
   test_play_pack_pieces();
   test_group_screens();
   test_group_conditions();
+  test_pack_finder();
   test_beetle_smoke();
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed ? 1 : 0;

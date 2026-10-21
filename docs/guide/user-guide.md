@@ -1,6 +1,6 @@
 ---
 status: current
-last-reviewed: 2026-10-15
+last-reviewed: 2026-10-19
 covers: src/shared-tile-owner.js, src/pixel-explain.js, src/project-health.js, src/sub-state-learn.js, src/game-states.js, src/memory-questions.js, src/memory-recorder.js, src/memory-panel.js, src/poses-panel.js, src/frame-poses.js, src/project-storage.js, tools/painter/game-states-panel.js, tools/painter/storage-panel.js, src/screen-gate.js, src/group-order.js, tools/painter/health-panel.js, src/recovery.js, src/work-journal.js, index.html, src/main.js, src/frame-capture.js, src/auto-capture.js, src/frame-step.js, tools/index.html, tools/project.html, tools/painter.js, tools/painter/, tools/painter/sprite-profiles-ui.js, tools/sprite-studio.html, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/art-pack.js, src/group-folders.js, src/group-screens.js, src/layer-art.js, src/paint-gaps.js, src/project-journal.js, src/frame-numbers.js, src/starter-paint.js
 ---
 
@@ -271,7 +271,11 @@ it shows a lot of internals. Here is what matters.
     at all) or **With uncoloured pixels** (any lit pixel nothing colours, partly painted tiles
     too). Each frame then says how much is left, e.g. "3 uncoloured tiles · 412 uncoloured px".
     It counts what the preview colours — group and sprite paint and overpaint — on the
-    left eye, recounts after you paint, and is remembered. The frame you're on always stays in
+    left eye, recounts after you paint, and is remembered. After a change to a group (adding a
+    pose, say) only the frames that show that group's tiles are recounted, so the next `<` `>`
+    is quick; a change that can reach every frame (painting, opening a pack, the first count)
+    shows **Counting uncoloured frames… n / total** under the buttons, which wait until it
+    finishes. The frame you're on always stays in
     the list. A picture (overpaint) behind a tile doesn't count as colouring it: an unpainted
     character in front of a painted backdrop still counts.
   - **Highlight**, next to Show while a filter is on (or press **H**): marks what is missing on
@@ -1152,6 +1156,17 @@ debug panels.
      game's title.
 4. Next time the player remembers the ROM and pack: just press **Play**. Choosing another file
    while a game runs restarts the player with it.
+
+**Share the `.vbcplay`, never the `.vbpack`.** The project file carries the ROM (the tools need
+it); the play pack doesn't, so it is the one to give people. They bring their own ROM.
+
+**The PC player** (`vbcolor-player`, built from `native/`; see
+[native/README.md](../../native/README.md)) needs only the ROM: drop it on the window, and the
+colour pack made for it is found by itself, from `Game.vbcplay` beside `Game.vb` or any pack in a
+`packs` folder (beside the player, or in `%APPDATA%\VBColor\Player\packs\`), matched by the ROM
+itself, whatever the files are called. To use a different pack, drop it on the window or press
+**Ctrl+O**; that choice is remembered for this game. **F10** goes back to finding one by itself;
+**Shift+F10** plays this game without colour. The title bar says where the colour came from.
 
 ## A workflow for a sprite-based game
 

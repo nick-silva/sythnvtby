@@ -1,7 +1,7 @@
 ---
 status: partial
-last-reviewed: 2026-10-13
-covers: tools/painter.js, tools/painter/, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/group-screens.js, src/color-layer.js, src/group-tile-colors.js, src/art-pack.js, src/zip-read.js, src/starter-paint.js, src/project-health.js, tests/e2e/s9-performance.mjs, src/lazy-entries.js, src/affine-world.js, src/memory-recorder.js, src/zip-write.js, tools/painter/pose-sources.js, src/pose-source-frames.js
+last-reviewed: 2026-10-19
+covers: tools/painter.js, tools/painter/, src/paint-change.js, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/group-screens.js, src/color-layer.js, src/group-tile-colors.js, src/art-pack.js, src/zip-read.js, src/starter-paint.js, src/project-health.js, tests/e2e/s9-performance.mjs, src/lazy-entries.js, src/affine-world.js, src/memory-recorder.js, src/zip-write.js, tools/painter/pose-sources.js, src/pose-source-frames.js
 ---
 
 # Making the tools snappy at 250, 500 and 1000+ frames
@@ -118,6 +118,22 @@ What changed:
 Not done, and why: **summaries in the pack file** and **a compact draw list** — both change the
 pack format, and with frames kept compressed the draw list is no longer what fills memory. They
 fold into Phase 3, which changes how a project is stored anyway.
+
+## Show filter recount (built Oct 19 2026)
+
+With a Show filter on (uncoloured tiles or pixels), any group edit used to recount every frame
+on the next `<` `>`, synchronously: on *Mario's Tennis* at 795 frames that froze the page for
+11–17 s after each "New pose from selection" (about 10 ms a frame, half of it decoding the
+frame). Now `src/paint-change.js` works out which patterns an edit can recolour — every pattern
+of each group that was replaced, added or removed — and the frame list keeps the patterns each
+frame shows, so only frames showing one of them are recounted. Anything that can reach any frame
+(a stroke or undo, another pack, a whole-layer or tile-slot group, groups reordered) still
+recounts all of them. Recounts over 40 frames run a slice per tick behind a "Counting uncoloured
+frames… n / total" note, with `<` `>` disabled until done.
+
+Checked on the real pack: for ten groups across the game, an edit's skipped frames measured the
+same as a full recount (0 differences). Adding a one-tile Koopa pose and stepping: 11 s → 0.37 s.
+Groups whose tiles are on every match screen (court, net, scoreboard) still touch ~760 frames.
 
 ## Plan
 

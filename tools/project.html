@@ -183,6 +183,17 @@
     .frame-step { display: inline-flex; align-items: center; gap: 0.25rem; }
     .frame-step .btn-ghost { font-size: 0.8rem; padding: 0.1rem 0.45rem; line-height: 1.2; }
     .frame-step #frame-position { font-size: 0.68rem; font-family: var(--font-mono); min-width: 3.2rem; }
+    /* Shown while the Show filter recounts frames after an edit (tools/painter/frame-list.js). */
+    .frame-busy { display: flex; align-items: center; gap: 0.35rem; font-size: 0.68rem; }
+    .frame-busy[hidden] { display: none; }
+    .frame-busy-spinner {
+      width: 0.75rem; height: 0.75rem; flex: none; border-radius: 50%;
+      border: 2px solid currentColor; border-right-color: transparent;
+      animation: frame-busy-spin 0.8s linear infinite;
+    }
+    @keyframes frame-busy-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .frame-busy-spinner { animation-duration: 2.4s; } }
+    body.frame-counting #frame-select { cursor: progress; }
 
     /* Main shell */
     .shell {
@@ -1142,6 +1153,7 @@
             <span id="frame-position" class="muted" aria-live="polite"></span>
             <button type="button" class="btn-ghost" id="btn-frame-next" disabled title="Next frame" aria-label="Next frame">&gt;</button>
           </div>
+          <div id="frame-count-busy" class="frame-busy muted" role="status" hidden><span class="frame-busy-spinner" aria-hidden="true"></span><span id="frame-count-busy-text"></span></div>
           <div class="frame-panel-row">
             <label title="Narrow the Frame list (and &lt; &gt;) to frames still needing colour: tiles with no paint at all, or any lit pixel nothing colours (partly painted tiles too). Left eye.">Show <select id="frame-filter">
               <option value="all">All frames</option>

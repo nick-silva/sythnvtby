@@ -2,10 +2,14 @@
 // and an emulator behind its Emulator interface (Beetle VB for now), with an SDL2 window,
 // controller and audio, and draws the game's colour from a play pack (.vbcplay) over it with the
 // library's colour layer. Usage: vbcolor-player <game.vb> [--pack game.vbcplay]
-// [--view 2d|sbs|anaglyph], or drop a ROM and a play pack on the window. Design:
+// [--packs-dir folder] [--view 2d|sbs|anaglyph], or drop a ROM on the window. The ROM's play
+// pack is found by itself (vbcolor/pack_finder.hpp): the player's choice for that ROM, else
+// <game>.vbcplay beside it, else a packs folder. Dropping a pack (or Ctrl+O) chooses it for the
+// ROM; F10 goes back to finding one; Shift+F10 plays without colour. Design:
 // docs/design/vb-color-player.md. For unattended checks: --frames N runs N frames and quits,
 // --screenshot out.bmp saves the last picture, --tap-start presses Start every two seconds.
 #include <SDL.h>
+#include <SDL_syswm.h>
 
 #include <algorithm>
 #include <cctype>
@@ -23,9 +27,21 @@
 #include "vbcolor/beetle.hpp"
 #include "vbcolor/colorizer.hpp"
 #include "vbcolor/emulator.hpp"
+#include "vbcolor/pack_finder.hpp"
 #include "vbcolor/play_pack.hpp"
 #include "vbcolor/rom_identity.hpp"
 #include "vbcolor/stereo.hpp"
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <commdlg.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -108,6 +124,46 @@ bool is_play_pack(const fs::path& p) {
   return ext == ".vbcplay";
 }
 
+/**
+ * Where packs are looked for by ROM: a "packs" folder beside the player (a portable download) and
+ * one in the user's app-data folder (made on first run, so there is somewhere to put them).
+ */
+std::vector<fs::path> default_packs_dirs() {
+  std::vector<fs::path> dirs;
+  if (char* base = SDL_GetBasePath()) {
+    dirs.push_back(fs::u8path(base) / "packs");
+    SDL_free(base);
+  }
+  const fs::path own = save_dir() / "packs";
+  std::error_code ec;
+  fs::create_directories(own, ec);
+  dirs.push_back(own);
+  return dirs;
+}
+
+/** A file picker for a play pack; nothing where the platform has none (drop a pack instead). */
+std::optional<fs::path> ask_for_pack_file(SDL_Window* window) {
+#ifdef _WIN32
+  SDL_SysWMinfo wm;
+  SDL_VERSION(&wm.version);
+  HWND owner = SDL_GetWindowWMInfo(window, &wm) ? wm.info.win.window : nullptr;
+  wchar_t file[MAX_PATH] = L"";
+  OPENFILENAMEW ofn{};
+  ofn.lStructSize = sizeof ofn;
+  ofn.hwndOwner = owner;
+  ofn.lpstrFilter = L"Play packs (*.vbcplay)\0*.vbcplay\0All files\0*.*\0";
+  ofn.lpstrFile = file;
+  ofn.nMaxFile = MAX_PATH;
+  ofn.lpstrTitle = L"Choose a colour pack for this game";
+  ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+  if (!GetOpenFileNameW(&ofn)) return std::nullopt;
+  return fs::path(file);
+#else
+  (void)window;
+  return std::nullopt;
+#endif
+}
+
 std::optional<vbc::ViewMode> parse_view(const std::string& s) {
   if (s == "2d" || s == "flat") return vbc::ViewMode::Flat;
   if (s == "sbs" || s == "side-by-side") return vbc::ViewMode::SideBySide;
@@ -124,9 +180,11 @@ struct AutoRun {
 
 class Player {
  public:
-  bool init(vbc::ViewMode view, const AutoRun& autorun = {}) {
+  bool init(vbc::ViewMode view, const AutoRun& autorun, std::vector<fs::path> packs_dirs) {
     view_ = view;
     autorun_ = autorun;
+    packs_dirs_ = std::move(packs_dirs);
+    choices_ = std::make_unique<vbc::PackChoices>(save_dir() / "pack-choices.json");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0) {
       std::fprintf(stderr, "SDL could not start: %s\n", SDL_GetError());
       return false;
@@ -154,6 +212,7 @@ class Player {
     SDL_Quit();
   }
 
+  /** Start a ROM and colour it with its pack (see the top of this file), unless one is kept from the command line. */
   bool start_game(const fs::path& rom_path) {
     stop_game();
     auto rom = read_file(rom_path);
@@ -169,7 +228,15 @@ class Player {
       return false;
     }
     rom_name_ = rom_path.stem().u8string();
+    rom_path_ = rom_path;
     rom_id_ = vbc::rom_identity(*rom);
+    if (pack_ && pack_dropped_early_) {
+      // A pack dropped before any game: it is the choice for the first one.
+      pack_dropped_early_ = false;
+      remember_choice(pack_path_);
+    } else if (!keep_pack_) {
+      use_found_pack();
+    }
     check_rom();
     const fs::path dir = save_dir();
     sram_path_ = dir / (rom_name_ + ".srm");
@@ -182,8 +249,14 @@ class Player {
     return true;
   }
 
+  /** A pack named on the command line: used for every game this session, never remembered. */
+  bool load_pack_for_session(const fs::path& path) {
+    keep_pack_ = true;
+    return load_pack(path, "command line");
+  }
+
   /** Use a play pack's colour. The game keeps running; a different ROM gets a warning. */
-  bool load_pack(const fs::path& path) {
+  bool load_pack(const fs::path& path, const std::string& from) {
     auto bytes = read_file(path);
     if (!bytes) {
       report("Could not read " + path.u8string());
@@ -200,7 +273,11 @@ class Player {
     }
     colour_on_ = true;
     warned_rom_ = false;
-    std::printf("Play pack: %s (%zu groups, %zu tile colours)\n", pack_->info.title.c_str(), pack_->groups.size(), pack_->tile_colors.size());
+    chose_no_colour_ = false;
+    pack_path_ = path;
+    pack_from_ = from;
+    std::printf("Play pack (%s): %s, %s (%zu groups, %zu tile colours)\n", from.c_str(), pack_->info.title.c_str(),
+                path.u8string().c_str(), pack_->groups.size(), pack_->tile_colors.size());
     if (pack_->unsupported_overrides || pack_->unsupported_v2_rules || pack_->unsupported_overlays) {
       std::fprintf(stderr, "This pack uses position overrides, Painter v2 rules or old overlays, which this player does not draw yet.\n");
     }
@@ -241,6 +318,72 @@ class Player {
   }
 
  private:
+  // --- which pack colours the game ------------------------------------------------------------
+
+  /** The pack the finder picks for this ROM: the player's choice, beside the game, a packs folder. */
+  void use_found_pack() {
+    const vbc::FoundPack found = vbc::find_play_pack(rom_path_, rom_id_, packs_dirs_, *choices_);
+    for (const auto& note : found.notes) warn(note);
+    if (found.source != vbc::PackSource::None && load_pack(found.path, vbc::pack_source_name(found.source))) return;
+    unload_pack();
+    chose_no_colour_ = found.chose_none;
+    std::printf(chose_no_colour_ ? "%s: no colour (your choice; F10 finds a pack again)\n" : "%s: no play pack found for this ROM\n",
+                rom_name_.c_str());
+  }
+
+  /** A pack dropped on the window or picked with Ctrl+O: use it, and remember it for this ROM. */
+  void choose_pack(const fs::path& path) {
+    if (!emu_) {
+      // No game yet: it becomes the first game's choice.
+      if (load_pack(path, "your choice")) pack_dropped_early_ = true;
+      update_title();
+      return;
+    }
+    keep_pack_ = false;
+    if (!load_pack(path, "your choice")) return;
+    remember_choice(path);
+  }
+
+  void remember_choice(const fs::path& path) {
+    pack_from_ = "your choice";
+    if (choices_->choose_pack(rom_id_.sha1, path)) {
+      std::printf("Remembered %s for %s. F10 goes back to finding a pack by itself.\n", path.filename().u8string().c_str(), rom_name_.c_str());
+    } else {
+      warn("Could not save the pack choice (" + save_dir().u8string() + "); it holds until the player closes.");
+    }
+    update_title();
+  }
+
+  /** F10: forget this ROM's choice and find its pack again. */
+  void find_pack_again() {
+    if (!emu_) return;
+    keep_pack_ = false;
+    choices_->forget(rom_id_.sha1);
+    use_found_pack();
+    check_rom();
+    update_title();
+  }
+
+  /** Shift+F10: this ROM plays without colour, remembered. */
+  void choose_no_colour() {
+    if (!emu_) return;
+    keep_pack_ = false;
+    if (!choices_->choose_none(rom_id_.sha1)) warn("Could not save the choice (" + save_dir().u8string() + ").");
+    unload_pack();
+    chose_no_colour_ = true;
+    update_title();
+  }
+
+  void unload_pack() {
+    colorizer_.reset();
+    pack_.reset();
+    pack_path_.clear();
+    pack_from_.clear();
+    pack_dropped_early_ = false;
+  }
+
+  // --- events -----------------------------------------------------------------------------------
+
   bool handle(const SDL_Event& e) {
     switch (e.type) {
       case SDL_QUIT:
@@ -248,7 +391,7 @@ class Player {
       case SDL_DROPFILE: {
         const fs::path path = fs::u8path(e.drop.file);
         SDL_free(e.drop.file);
-        if (is_play_pack(path)) load_pack(path);
+        if (is_play_pack(path)) choose_pack(path);
         else start_game(path);
         return true;
       }
@@ -283,6 +426,18 @@ class Player {
         if (colorizer_) {
           colour_on_ = !colour_on_;
           update_title();
+        }
+        return true;
+      case SDLK_F10:
+        if (k.keysym.mod & KMOD_SHIFT) choose_no_colour();
+        else find_pack_again();
+        return true;
+      case SDLK_o:
+        if (ctrl) {
+          if (auto path = ask_for_pack_file(window_)) choose_pack(*path);
+#ifndef _WIN32
+          else std::printf("Drop a play pack (.vbcplay) on the window to choose it.\n");
+#endif
         }
         return true;
       case SDLK_v:
@@ -425,8 +580,9 @@ class Player {
     std::string t = "sythnvtby Player";
     if (emu_) t += " - " + (pack_ ? pack_->info.title : rom_name_);
     else t += " - drop a Virtual Boy ROM (.vb) here";
-    if (pack_) t += colour_on_ ? " - Colour (F9)" : " - Monochrome (F9)";
-    else if (emu_) t += " - drop a play pack (.vbcplay) for colour";
+    if (pack_) t += (colour_on_ ? " - Colour (F9), " : " - Monochrome (F9), ") + pack_from_;
+    else if (emu_ && chose_no_colour_) t += " - no colour (your choice, F10 finds a pack)";
+    else if (emu_) t += " - no colour pack found (drop one here, or Ctrl+O)";
     t += std::string(" - ") + vbc::view_mode_name(view_) + " (V)";
     if (paused_) t += " - paused (P)";
     SDL_SetWindowTitle(window_, t.c_str());
@@ -436,6 +592,11 @@ class Player {
     std::fprintf(stderr, "%s\n", message.c_str());
     // Unattended runs must never wait on a dialog.
     if (autorun_.frames < 0) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sythnvtby Player", message.c_str(), window_);
+  }
+
+  void warn(const std::string& message) {
+    std::fprintf(stderr, "%s\n", message.c_str());
+    if (autorun_.frames < 0) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "sythnvtby Player", message.c_str(), window_);
   }
 
   SDL_Window* window_ = nullptr;
@@ -453,7 +614,15 @@ class Player {
   long frames_run_ = 0;
   bool paused_ = false;
   std::string rom_name_;
+  fs::path rom_path_;
   vbc::RomIdentity rom_id_;
+  std::vector<fs::path> packs_dirs_;
+  std::unique_ptr<vbc::PackChoices> choices_;
+  fs::path pack_path_;
+  std::string pack_from_;            // where the pack came from, for the title bar
+  bool keep_pack_ = false;           // a --pack: kept for every game this session
+  bool pack_dropped_early_ = false;  // dropped before any game: the first game's choice
+  bool chose_no_colour_ = false;
   std::optional<vbc::PlayPack> pack_;
   std::unique_ptr<vbc::Colorizer> colorizer_;
   vbc::EyeColor left_colour_;
@@ -473,6 +642,7 @@ int main(int argc, char** argv) {
   std::optional<fs::path> pack;
   vbc::ViewMode view = vbc::ViewMode::Flat;
   AutoRun autorun;
+  std::vector<fs::path> packs_dirs;
   for (int i = 1; i < argc; i++) {
     const std::string arg = argv[i];
     if (arg == "--view" && i + 1 < argc) {
@@ -480,6 +650,8 @@ int main(int argc, char** argv) {
       else std::fprintf(stderr, "Unknown view %s (2d, sbs, anaglyph)\n", argv[i]);
     } else if (arg == "--pack" && i + 1 < argc) {
       pack = fs::u8path(argv[++i]);
+    } else if (arg == "--packs-dir" && i + 1 < argc) {
+      packs_dirs.push_back(fs::u8path(argv[++i]));
     } else if (arg == "--frames" && i + 1 < argc) {
       autorun.frames = std::atol(argv[++i]);
     } else if (arg == "--screenshot" && i + 1 < argc) {
@@ -487,7 +659,13 @@ int main(int argc, char** argv) {
     } else if (arg == "--tap-start") {
       autorun.tap_start = true;
     } else if (arg == "--help" || arg == "-h") {
-      std::printf("Usage: vbcolor-player <game.vb> [--pack game.vbcplay] [--view 2d|sbs|anaglyph] [--frames N] [--screenshot out.bmp] [--tap-start]\n");
+      std::printf(
+          "Usage: vbcolor-player <game.vb> [--pack game.vbcplay] [--packs-dir folder] [--view 2d|sbs|anaglyph]\n"
+          "                      [--frames N] [--screenshot out.bmp] [--tap-start]\n"
+          "Without --pack, the game's colour pack is found by itself: your choice for that ROM, else\n"
+          "<game>.vbcplay beside it, else any pack made for it in a packs folder (--packs-dir, the\n"
+          "'packs' folder beside the player, and %s).\n",
+          (save_dir() / "packs").u8string().c_str());
       return 0;
     } else if (is_play_pack(fs::u8path(arg))) {
       pack = fs::u8path(arg);
@@ -495,10 +673,11 @@ int main(int argc, char** argv) {
       rom = fs::u8path(arg);
     }
   }
+  for (auto& dir : default_packs_dirs()) packs_dirs.push_back(std::move(dir));
   Player player;
-  if (!player.init(view, autorun)) return 1;
+  if (!player.init(view, autorun, std::move(packs_dirs))) return 1;
+  if (pack && !player.load_pack_for_session(*pack)) return 1;
   if (rom && !player.start_game(*rom)) return 1;
-  if (pack && !player.load_pack(*pack)) return 1;
   player.run();
   return 0;
 }

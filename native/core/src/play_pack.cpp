@@ -484,8 +484,10 @@ bool group_shown_on_screen(const Group& group, const uint8_t* wram, size_t size)
   return group.screens->only ? hit : !hit;
 }
 
-PlayPack load_play_pack(const std::vector<uint8_t>& bytes) {
-  Zip zip(bytes);
+namespace {
+
+/** play.json, checked: format, version and which ROM it is for. Throws PlayPackError. */
+PlayPackInfo read_info(Zip& zip) {
   if (!zip.ok()) throw PlayPackError("This file is not a play pack (it could not be opened as one).");
   auto info_bytes = zip.read("play.json");
   if (!info_bytes) {
@@ -501,28 +503,42 @@ PlayPack load_play_pack(const std::vector<uint8_t>& bytes) {
                         (info.contains("version") ? info["version"].dump() : std::string("?")) + ", player reads 1).");
   }
   const json rom = info.contains("rom") ? info["rom"] : json();
-  PlayPack pack;
-  pack.info.title = str_or(info, "title");
-  pack.info.author = str_or(info, "author");
-  pack.info.created_at = str_or(info, "createdAt");
-  pack.info.rom_file_name = str_or(rom, "fileName");
-  pack.info.rom_sha1 = str_or(rom, "sha1");
-  pack.info.rom_crc32 = str_or(rom, "crc32");
+  PlayPackInfo out;
+  out.title = str_or(info, "title");
+  out.author = str_or(info, "author");
+  out.created_at = str_or(info, "createdAt");
+  out.rom_file_name = str_or(rom, "fileName");
+  out.rom_sha1 = str_or(rom, "sha1");
+  out.rom_crc32 = str_or(rom, "crc32");
   if (rom.is_object() && rom.contains("size")) {
-    if (auto s = as_int(rom["size"])) pack.info.rom_size = *s;
+    if (auto s = as_int(rom["size"])) out.rom_size = *s;
   }
-  if (pack.info.rom_sha1.empty() && pack.info.rom_crc32.empty()) throw PlayPackError("This play pack does not say which ROM it is for.");
-  pack.info.paint_on_transparent =
+  if (out.rom_sha1.empty() && out.rom_crc32.empty()) throw PlayPackError("This play pack does not say which ROM it is for.");
+  out.paint_on_transparent =
       info.contains("paintOnTransparent") && info["paintOnTransparent"].is_boolean() && info["paintOnTransparent"].get<bool>();
   if (info.contains("brightnessReference") && info["brightnessReference"].is_number()) {
     const double r = info["brightnessReference"].get<double>();
-    if (std::isfinite(r) && r > 0) pack.info.brightness_reference = r;
+    if (std::isfinite(r) && r > 0) out.brightness_reference = r;
   }
   if (info.contains("features") && info["features"].is_array()) {
     for (const auto& f : info["features"]) {
-      if (f.is_string()) pack.info.features.push_back(f.get<std::string>());
+      if (f.is_string()) out.features.push_back(f.get<std::string>());
     }
   }
+  return out;
+}
+
+}  // namespace
+
+PlayPackInfo read_play_pack_info(const std::vector<uint8_t>& bytes) {
+  Zip zip(bytes);
+  return read_info(zip);
+}
+
+PlayPack load_play_pack(const std::vector<uint8_t>& bytes) {
+  Zip zip(bytes);
+  PlayPack pack;
+  pack.info = read_info(zip);
   if (auto vbcolor = zip.read("color.vbcolor")) pack.tile_colors = parse_vbcolor(vbcolor->data(), vbcolor->size());
   if (auto groups = zip.read("groups.json")) pack.groups = parse_groups_json(*groups);
   if (auto overrides = zip.read("overrides.json")) {

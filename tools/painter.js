@@ -2231,16 +2231,17 @@ function wireMenus() {
   const frameFilterSelect = /** @type {HTMLSelectElement|null} */ (document.getElementById('frame-filter'));
   if (frameFilterSelect) {
     frameFilterSelect.value = frameFilter;
-    frameFilterSelect.addEventListener('change', () => {
+    frameFilterSelect.addEventListener('change', async () => {
       setFrameFilter(UNCOLOURED_FILTERS[frameFilterSelect.value] ? frameFilterSelect.value : 'all');
       try {
         localStorage.setItem(FRAME_FILTER_KEY, frameFilter);
       } catch {
         /* the filter just isn't remembered */
       }
-      applyFrameFilter(true);
       syncFrameHighlightUi();
       render();
+      // Counts are kept per frame and redone only where paint changed (tools/painter/frame-list.js).
+      await applyFrameFilter();
       if (frameFilter !== 'all') {
         const n = shownFrameOptions().length;
         setStatus(`Showing ${n} of ${availableFrames.length} frame(s) ${frameFilter === 'tiles' ? 'with tiles that have no paint' : 'with pixels nothing colours'}.`);

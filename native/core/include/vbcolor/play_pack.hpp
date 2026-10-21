@@ -137,6 +137,9 @@ struct PlayPackError : std::runtime_error {
 /** Read a .vbcplay. Throws PlayPackError. */
 PlayPack load_play_pack(const std::vector<uint8_t>& bytes);
 
+/** Only a .vbcplay's play.json (title, which ROM it is for), checked as load_play_pack does. Throws PlayPackError. */
+PlayPackInfo read_play_pack_info(const std::vector<uint8_t>& bytes);
+
 /** The groups in a groups.json (its screens settings resolved against its gameStatePools). Throws PlayPackError. */
 std::vector<Group> parse_groups_json(const std::vector<uint8_t>& bytes);
 

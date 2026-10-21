@@ -5,6 +5,7 @@ add_library(vbcolor_core STATIC
   src/vip_frame.cpp
   src/rom_identity.cpp
   src/play_pack.cpp
+  src/pack_finder.cpp
   src/vip_state_json.cpp
   src/colorizer.cpp
 )

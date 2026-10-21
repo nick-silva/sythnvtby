@@ -1,6 +1,6 @@
 ---
 status: living
-last-reviewed: 2026-10-14
+last-reviewed: 2026-10-17
 ---
 
 # Priorities and what's next
@@ -711,6 +711,11 @@ bugs; the rest are gaps.
 ---
 
 ## Shipping to players
+
+**Built Oct 17 2026:** the PC player keeps the ROM and the pack apart and finds a ROM's pack by
+itself: the player's remembered choice, then `Game.vbcplay` beside the game, then any pack for that
+ROM's SHA-1 in a packs folder ([vb-color-player.md](../design/vb-color-player.md#finding-a-play-pack)).
+Left: the same in the web player, and offering packs from a packs repo.
 
 Two halves of the same idea, neither started (and a third, backlogged: libretro compatibility, below). A `.vbpack` is a **working project** and is meant
 to be big — measured on `Mario-Clash-Japan-USA-v3-annotated.vbpack`, 153 MB across 106 captured

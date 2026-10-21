@@ -3,6 +3,7 @@
  * and highlights, stepping between frames. Split out of tools/painter.js, which passes in the state and functions it shares (initFrameList).
  */
 import { measureUncoloured, UNCOLOURED_FILTERS, describeUncoloured, uncolouredMasks, highlightUncoloured } from '../../src/uncoloured.js';
+import { changedPatterns, framePatterns, frameTouched } from '../../src/paint-change.js';
 import { deserializeVIPState, validateVIPState } from '../../src/vip-dump.js';
 import { getCompositePixelInfo } from '../../src/color-layer.js';
 import { affineStandInDraws } from '../../src/affine-world.js';
@@ -138,22 +139,38 @@ export function applyFrameHighlight(imageData, viewState) {
   }
 }
 
-/** Each frame's measurement, and the paint it was measured against. */
-let frameMeasure = { sig: '', list: /** @type {Array<{ tiles: number, pixels: number } | null>} */ ([]) };
+/**
+ * Each frame's measurement and the patterns it shows, the frame row it was taken from, and the
+ * paint it was measured against (`sig` for everything but the groups, which are compared one by
+ * one: src/paint-change.js).
+ */
+let frameMeasure = {
+  sig: '',
+  groupsSig: '',
+  groups: /** @type {any[]} */ ([]),
+  rows: /** @type {any[]} */ ([]),
+  list: /** @type {Array<{ tiles: number, pixels: number } | null>} */ ([]),
+  shown: /** @type {Array<Set<number> | null>} */ ([]),
+};
 const paintEditIds = new WeakMap();
 let paintEditNext = 1;
 
-/** A stamp that changes whenever paint may have: another pack, a stroke or undo, groups edited. */
+/** A stamp that changes whenever paint other than the groups may have: another pack, a stroke or undo. */
 function paintSignature() {
   const id = (o) => {
     if (!o) return 0;
     if (!paintEditIds.has(o)) paintEditIds.set(o, paintEditNext++);
     return paintEditIds.get(o);
   };
+  const top = ctx.paintUndoStack[ctx.paintUndoStack.length - 1];
+  return [id(ctx.loadedPackParts), ctx.paintUndoStack.length, id(top), ctx.pack.size, id(ctx.gameStatePools), getActiveV2VariantId() ?? ''].join('|');
+}
+
+/** A stamp of the groups' patterns and screens, to catch a group changed in place (not replaced). */
+function groupsSignature() {
   const crit = ctx.groups.reduce((n, g) => n + (g?.criteria?.hashes?.length || 0) + (g?.criteria?.windowIds?.length || 0), 0);
   const screens = ctx.groups.map((g) => (g?.screens ? `${g.id}:${JSON.stringify(g.screens)}` : '')).join('');
-  const top = ctx.paintUndoStack[ctx.paintUndoStack.length - 1];
-  return [id(ctx.loadedPackParts), ctx.paintUndoStack.length, id(top), ctx.pack.size, ctx.groups.length, crit, ctx.availableFrames.length, id(ctx.gameStatePools), screens].join('|');
+  return `${ctx.groups.length}|${crit}|${screens}`;
 }
 
 /** What colours a frame, as the preview has it. */
@@ -161,31 +178,102 @@ export function paintForMeasure() {
   return { pack: ctx.pack, overrides: ctx.overrides, groups: ctx.groups, gameStatePools: ctx.gameStatePools, painterV2Rules: ctx.painterV2Rules, variantId: getActiveV2VariantId() };
 }
 
-/** How uncoloured each frame is (recounted only when the paint changed). */
-function frameMeasurements(force = false) {
-  const sig = paintSignature();
-  if (!force && frameMeasure.sig === sig && frameMeasure.list.length === ctx.availableFrames.length) return frameMeasure.list;
-  const paint = paintForMeasure();
-  const list = ctx.availableFrames.map((row, i) => {
-    try {
-      return measureUncoloured(deserializeVIPState(JSON.parse(row.json)), { ...paint, wram: wramForFrameIndex(i) });
-    } catch {
-      return null;
-    }
-  });
-  frameMeasure = { sig, list };
-  return list;
+/**
+ * The frames whose count may be out of date: all of them after a change that can reach any frame,
+ * otherwise new or replaced frames and those showing a pattern of a group that changed.
+ * @returns {number[]}
+ */
+function framesToRecount(force) {
+  const n = ctx.availableFrames.length;
+  const all = () => Array.from({ length: n }, (_, i) => i);
+  if (force || frameMeasure.sig !== paintSignature()) return all();
+  const sameGroupsSig = frameMeasure.groupsSig === groupsSignature();
+  let changed = /** @type {Set<number> | null} */ (new Set());
+  if (frameMeasure.groups !== ctx.groups) changed = changedPatterns(frameMeasure.groups, ctx.groups);
+  // The stamp moved but no group was replaced: one was changed in place, so anything may have.
+  if (!changed || (!changed.size && !sameGroupsSig)) return all();
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const fresh = i < frameMeasure.list.length && frameMeasure.rows[i] === ctx.availableFrames[i];
+    if (!fresh || (changed.size && frameTouched(frameMeasure.shown[i], changed))) out.push(i);
+  }
+  return out;
 }
 
-/**
- * Hide the frames the Show filter leaves out (the one you are on always stays), and note each
- * shown frame's uncoloured tiles and pixels. Options keep their frame index as value, so
- * everything that picks a frame by number still works.
- */
-export function applyFrameFilter(force = false) {
-  if (!ctx.frameSelect) return;
+/** Recounts this small are done at once; larger ones show the busy note and run a slice per tick. */
+const RECOUNT_AT_ONCE = 40;
+/** Time per slice of a large recount, so the page keeps drawing the progress. */
+const RECOUNT_SLICE_MS = 30;
+
+/** The recount running now, if any. @type {Promise<void> | null} */
+let recounting = null;
+
+/** Measure frame `i` against `paint` into `into` (the next frameMeasure). */
+function measureFrame(i, paint, into) {
+  const row = ctx.availableFrames[i];
+  into.rows[i] = row;
+  try {
+    const state = deserializeVIPState(JSON.parse(row.json));
+    into.list[i] = measureUncoloured(state, { ...paint, wram: wramForFrameIndex(i) });
+    into.shown[i] = framePatterns(state);
+  } catch {
+    into.list[i] = null;
+    into.shown[i] = null;
+  }
+}
+
+/** Start measuring: a copy of what is kept, sized to the frames there are now, with the paint's stamps. */
+function beginRecount() {
+  const n = ctx.availableFrames.length;
+  return {
+    sig: paintSignature(),
+    groupsSig: groupsSignature(),
+    groups: ctx.groups,
+    rows: frameMeasure.rows.slice(0, n),
+    list: frameMeasure.list.slice(0, n),
+    shown: frameMeasure.shown.slice(0, n),
+  };
+}
+
+/** The busy note under the frame buttons ("Counting uncoloured frames… 120 / 794"); hidden at total 0. */
+function showRecountProgress(done, total) {
+  const box = document.getElementById('frame-count-busy');
+  const text = document.getElementById('frame-count-busy-text');
+  const busy = total > 0;
+  if (box) box.hidden = !busy;
+  if (text) text.textContent = busy ? `Counting uncoloured frames… ${done} / ${total}` : '';
+  document.body.classList.toggle('frame-counting', busy);
+  syncFrameStepButtons();
+}
+
+/** Recount these frames a slice per tick, showing progress; the result is kept when all are done. */
+function recountInSlices(indices) {
+  const into = beginRecount();
+  const paint = paintForMeasure();
+  return new Promise((resolve) => {
+    let k = 0;
+    const step = () => {
+      const until = performance.now() + RECOUNT_SLICE_MS;
+      while (k < indices.length && performance.now() < until) measureFrame(indices[k++], paint, into);
+      if (k < indices.length) {
+        showRecountProgress(k, indices.length);
+        setTimeout(step, 0);
+        return;
+      }
+      // Paint changed while counting is caught on the next look, compared with what was counted.
+      frameMeasure = into;
+      resolve();
+    };
+    showRecountProgress(0, indices.length);
+    // Let the page draw the note before the first slice.
+    setTimeout(step, 0);
+  });
+}
+
+/** Write the measurements into the frame list: a note on each option, frames the filter leaves out hidden. */
+function showFrameFilter() {
   const filter = UNCOLOURED_FILTERS[frameFilter] || UNCOLOURED_FILTERS.all;
-  const list = frameFilter === 'all' ? null : frameMeasurements(force);
+  const list = frameFilter === 'all' ? null : frameMeasure.list;
   const cur = ctx.frameSelect.value;
   for (const o of ctx.frameSelect.options) {
     const base = o.dataset.base ?? o.textContent ?? '';
@@ -197,14 +285,55 @@ export function applyFrameFilter(force = false) {
   syncFrameStepButtons();
 }
 
+/**
+ * Hide the frames the Show filter leaves out (the one you are on always stays), and note each
+ * shown frame's uncoloured tiles and pixels. Options keep their frame index as value, so
+ * everything that picks a frame by number still works. Only frames the paint may have changed
+ * are recounted; a large recount runs a slice at a time with a busy note (the list keeps its old
+ * counts meanwhile), and the promise settles once the list is up to date.
+ * @param {boolean} [force] recount every frame
+ * @returns {Promise<void>}
+ */
+export function applyFrameFilter(force = false) {
+  if (!ctx.frameSelect) return Promise.resolve();
+  if (frameFilter === 'all') {
+    showFrameFilter();
+    return Promise.resolve();
+  }
+  // One recount at a time; look again when it ends (paint may have changed meanwhile).
+  if (recounting) return recounting.then(() => applyFrameFilter(force));
+  const todo = framesToRecount(force);
+  if (todo.length <= RECOUNT_AT_ONCE) {
+    if (todo.length || frameMeasure.groups !== ctx.groups) {
+      const into = beginRecount();
+      const paint = paintForMeasure();
+      for (const i of todo) measureFrame(i, paint, into);
+      frameMeasure = into;
+    }
+    showFrameFilter();
+    return Promise.resolve();
+  }
+  showFrameFilter();
+  recounting = recountInSlices(todo).finally(() => {
+    recounting = null;
+    showRecountProgress(0, 0);
+  });
+  return recounting.then(() => applyFrameFilter());
+}
+
 /** The frames the list shows, in order. */
 export function shownFrameOptions() {
   return ctx.frameSelect ? [...ctx.frameSelect.options].filter((o) => !o.hidden) : [];
 }
 
-export function stepFrame(delta) {
-  if (!ctx.frameSelect || !ctx.availableFrames.length) return;
-  applyFrameFilter();
+/**
+ * Step to the previous/next frame the list shows, once its counts are up to date. Clicks while a
+ * recount runs are ignored (the buttons are disabled then).
+ * @param {number} delta
+ */
+export async function stepFrame(delta) {
+  if (!ctx.frameSelect || !ctx.availableFrames.length || recounting) return;
+  await applyFrameFilter();
   const shown = shownFrameOptions();
   const at = shown.findIndex((o) => o.value === ctx.frameSelect.value);
   const next = shown[Math.max(0, Math.min(shown.length - 1, (at < 0 ? 0 : at) + delta))];
@@ -221,7 +350,8 @@ export function syncFrameStepButtons() {
   const n = ctx.availableFrames.length;
   const shown = shownFrameOptions();
   const at = ctx.frameSelect ? shown.findIndex((o) => o.value === ctx.frameSelect.value) : -1;
-  const ok = n > 0 && at >= 0;
+  // Not while the list is being recounted: a step then would land on stale counts.
+  const ok = n > 0 && at >= 0 && !document.body.classList.contains('frame-counting');
   if (prev) prev.disabled = !ok || at <= 0;
   if (next) next.disabled = !ok || at >= shown.length - 1;
   if (pos) pos.textContent = ok ? `${at + 1} / ${shown.length}${shown.length < n ? ` (of ${n})` : ''}` : '';

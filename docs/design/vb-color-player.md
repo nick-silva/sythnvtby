@@ -1,7 +1,7 @@
 ---
 status: partial
-last-reviewed: 2026-10-10
-covers: src/color-layer.js, src/layer-art.js, src/touch-up.js, src/stereo-twin.js, src/stereo-view.js, src/main.js, src/art-pack.js
+last-reviewed: 2026-10-17
+covers: src/color-layer.js, src/layer-art.js, src/touch-up.js, src/stereo-twin.js, src/stereo-view.js, src/main.js, src/art-pack.js, native/core/src/pack_finder.cpp, native/player-sdl/main.cpp
 ---
 
 # sythnvtby Player, and true stereo first
@@ -166,6 +166,26 @@ Changes to the existing system, all additive:
   touch-ups, fade, stereo twins) so the emulator and the player share it.
 - The web emulator can open a `.vbcplay` too (to see what players will see).
 
+### Finding a play pack
+
+**Built Oct 17 2026** in the SDL player (`native/core/src/pack_finder.cpp`, shared so a libretro
+core can reuse it — [libretro-core.md](libretro-core.md) plans the same order). The ROM and the
+pack stay separate files: a player downloads the player, brings their own ROM, and the pack made
+for it is found by itself. When a game starts, the first of these wins:
+
+1. **The player's choice for this ROM** (keyed by SHA-1, `pack-choices.json` in the app-data
+   folder): a pack dropped on the window or picked with Ctrl+O, or *no colour* (Shift+F10). F10
+   forgets it. A chosen pack that has gone is reported and the search carries on.
+2. **Beside the game:** `Game.vbcplay` next to `Game.vb`, when its `play.json` names this ROM; one
+   made for another ROM is skipped with a note.
+3. **A packs folder:** any `.vbcplay` naming this ROM (SHA-1; else CRC32 and size), the newest
+   `createdAt` of several. Folders: `--packs-dir`, `packs` beside the player, `packs` in the
+   app-data folder. Each keeps an `index.json` (file, size, time and the pack's `play.json` facts)
+   so packs are opened again only when they change.
+
+`--pack` still forces a pack for the session without remembering it. Not done yet: the same in the
+web player (packs remembered in the browser by SHA-1), and offering packs from a packs repo.
+
 ### 3c. Standalone PC app — native C++ (decided Oct 2 2026)
 
 ~~Tauri~~: dropped. A Switch build has no web engine, so the standalone player is native C++,
@@ -235,6 +255,8 @@ In order of effort:
    browser. Not ported: position overrides, Painter v2 rules, old overlays (unused so far). The
    port also found that the web player passed fade scale 1 instead of 1.34, dimming paint to 75%;
    fixed in `src/player.js`.
+7b. ~~ROM and pack kept apart, the pack found by ROM.~~ Done Oct 17 2026 in the SDL player
+   ([Finding a play pack](#finding-a-play-pack)).
 8. OpenXR front end (each eye's picture on a virtual screen, one per eye), before any Switch
    port. A SteamVR desktop viewer showing the SBS window works meanwhile.
 9. Switch (cardboard viewer, side-by-side) — needs our own core for a dev-kit build (GPL).
