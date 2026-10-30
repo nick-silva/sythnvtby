@@ -23,6 +23,7 @@ import { framePatternsForIndex, rebuildScreenIndex } from './screens-ui.js';
 import { formatByteSize, saveUi } from './paint-inventory-ui.js';
 import { refreshAnimatedShadeRamps, updateGroupDetail } from './group-detail.js';
 import { frameSummariesForSave } from './frame-summaries.js';
+import { uncolouredCountsForSave } from './frame-list.js';
 import { getCurrentFrameSelectIndex, getPainterV2LastVipFileForManifest, getRegistryFrameIdForFrameIndex, variantExistsInPools } from './pools.js';
 
 /** The tool's state and functions this part uses (tools/painter.js passes them in). */
@@ -256,6 +257,8 @@ export async function preparePainterVbpackParts(opts = {}) {
     ...(typeof groupsSchemaVersion === 'number' && { groupsSchemaVersion }),
     // What each frame shows, so the next open need not decode them (src/frame-summary.js).
     ...frameSummariesForSave(ctx.loadedPackParts, ctx.availableFrames),
+    // How uncoloured each frame is, for this paint, so the next open need not count them (src/uncoloured-counts.js).
+    ...uncolouredCountsForSave(),
     painterV2Rules: {
       ...defaultPainterV2Rules(),
       ...rules,

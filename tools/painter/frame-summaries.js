@@ -5,7 +5,7 @@
  */
 import { deserializeVIPState } from '../../src/vip-dump.js';
 import { brightnessReference, masterBrightnessLevels } from '../../src/fade.js';
-import { summarizeFrameForPack, savedSummaryFor, brightnessLevelsFor, frameSummariesJson, parseFrameSummaries } from '../../src/frame-summary.js';
+import { summarizeFrameForPack, savedSummaryFor, brightnessLevelsFor, frameSummariesJson, parseFrameSummaries, summaryPatterns } from '../../src/frame-summary.js';
 
 /** The open pack's saved summaries, parsed once per pack text. */
 let saved = { text: /** @type {unknown} */ (undefined), frames: /** @type {Record<string, any> | null} */ (null) };
@@ -20,6 +20,19 @@ function savedFrom(parts) {
 
 /** A frame row's text length, its summary's fingerprint, read without decompressing the frame. */
 const textLength = (row) => row.jsonSize ?? (typeof row.json === 'string' ? row.json.length : 0);
+export { textLength as frameTextLength };
+
+/**
+ * The patterns a frame shows to the left eye from its summary, saved or worked out this session,
+ * without decoding it; null when there is none yet (src/frame-summary.js summaryPatterns).
+ * @param {any} parts the open pack's parts @param {{ vipFile: string, jsonSize?: number, json?: string }} row
+ */
+export function knownFramePatterns(parts, row) {
+  const n = textLength(row);
+  const had = fresh.get(row.vipFile);
+  const s = savedSummaryFor(savedFrom(parts), row.vipFile, n) || (had && had.n === n ? had : null);
+  return s ? summaryPatterns(s) : null;
+}
 
 /**
  * A frame's summary: saved, worked out earlier this session, or worked out now (decoding it).

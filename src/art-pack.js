@@ -24,6 +24,7 @@ async function folderItems(matches, prefix, kind) {
   );
 }
 import { romIdentity } from './rom-identity.js';
+import { paintStamp, readUncolouredCounts, uncolouredCountsJson } from './uncoloured-counts.js';
 
 /**
  * Copy ArrayBuffer / TypedArray into a standalone ArrayBuffer (safe for zip + IndexedDB).
@@ -90,6 +91,11 @@ export const PACK_ENTRIES = {
    * decode every frame. Optional and rebuilt for any frame it does not match; old tools ignore it.
    */
   FRAME_SUMMARIES: 'framesummaries.json',
+  /**
+   * How much each captured frame leaves uncoloured, with a fingerprint of the colour entries it was
+   * counted against (src/uncoloured-counts.js). Optional; ignored once the paint changes.
+   */
+  UNCOLOURED_COUNTS: 'uncoloured.json',
 };
 
 /** Current document shape for {@link PACK_ENTRIES.PAINTER_V2_RULES}; forward-compatible fields allowed. */
@@ -275,6 +281,12 @@ async function parseArtPackFrom(zip) {
 
   const groupsJsonInPack = groupsRaw != null;
 
+  // Saved uncoloured counts, kept only while the colour entries are the ones they were counted on.
+  const uncolouredRaw = (await findZipFile(zip, PACK_ENTRIES.UNCOLOURED_COUNTS)?.async('string')) ?? null;
+  const uncolouredCounts = uncolouredRaw
+    ? readUncolouredCounts(uncolouredRaw, paintStamp({ vbcolor, overrides: overridesRaw, groups: groupsRaw, rules: painterV2RulesRaw }))
+    : null;
+
   return {
     ...(rom != null && { rom }),
     ...(vbcolor != null && { vbcolor }),
@@ -298,6 +310,7 @@ async function parseArtPackFrom(zip) {
     ...(painterV2VipOverlaysRaw != null &&
       painterV2VipOverlaysRaw.length > 0 && { painterV2VipOverlays: painterV2VipOverlaysRaw }),
     ...(frameSummariesRaw != null && frameSummariesRaw.length > 0 && { frameSummaries: frameSummariesRaw }),
+    ...(uncolouredCounts && { uncolouredCounts }),
     groupsJsonInPack,
   };
 }
@@ -453,11 +466,15 @@ export async function buildArtPack(parts, opts = {}) {
   if (parts.vbcolor && parts.vbcolor.byteLength > 0) {
     zip.file(PACK_ENTRIES.COLOR, parts.vbcolor);
   }
+  /** The colour entries as written, for the uncoloured counts' fingerprint (src/uncoloured-counts.js). */
+  const written = { vbcolor: null, overrides: null, groups: null, rules: null };
+  if (parts.vbcolor && parts.vbcolor.byteLength > 0) written.vbcolor = parts.vbcolor;
   if (parts.overrides != null) {
     const json = Array.isArray(parts.overrides)
       ? JSON.stringify(parts.overrides, null, 0)
       : JSON.stringify(parts.overrides);
     zip.file(PACK_ENTRIES.OVERRIDES, json);
+    written.overrides = json;
   }
   if (parts.vipState != null) {
     const vipJson = typeof parts.vipState === 'string'
@@ -552,9 +569,7 @@ export async function buildArtPack(parts, opts = {}) {
     (Array.isArray(parts.gameStates) && parts.gameStates.length > 0) ||
     typeof parts.groupsSchemaVersion === 'number';
   if (hasGroupsJson) {
-    zip.file(
-      PACK_ENTRIES.GROUPS,
-      JSON.stringify(
+    written.groups = JSON.stringify(
         {
           ...(typeof parts.groupsSchemaVersion === 'number' && { groupsSchemaVersion: parts.groupsSchemaVersion }),
           ...(Array.isArray(parts.gameStatePools) && parts.gameStatePools.length > 0 && { gameStatePools: parts.gameStatePools }),
@@ -564,18 +579,25 @@ export async function buildArtPack(parts, opts = {}) {
         },
         null,
         2,
-      ),
-    );
+      );
+    zip.file(PACK_ENTRIES.GROUPS, written.groups);
   }
 
   if (parts.painterV2Rules != null && typeof parts.painterV2Rules === 'object' && !Array.isArray(parts.painterV2Rules)) {
-    zip.file(PACK_ENTRIES.PAINTER_V2_RULES, JSON.stringify(parts.painterV2Rules, null, 2));
+    written.rules = JSON.stringify(parts.painterV2Rules, null, 2);
+    zip.file(PACK_ENTRIES.PAINTER_V2_RULES, written.rules);
   }
   if (typeof parts.painterV2VipOverlays === 'string' && parts.painterV2VipOverlays.length > 0) {
     zip.file(PACK_ENTRIES.PAINTER_V2_VIP_OVERLAYS, parts.painterV2VipOverlays);
   }
   if (typeof parts.frameSummaries === 'string' && parts.frameSummaries.length > 0) {
     zip.file(PACK_ENTRIES.FRAME_SUMMARIES, parts.frameSummaries);
+  }
+  // Counts the caller made against exactly this paint ({ variant, frames }); never carried over.
+  const counts = parts.uncolouredCounts;
+  if (counts && typeof counts === 'object' && counts.frames && typeof counts.frames === 'object') {
+    const json = uncolouredCountsJson(paintStamp(written), String(counts.variant ?? ''), counts.frames);
+    if (json) zip.file(PACK_ENTRIES.UNCOLOURED_COUNTS, json);
   }
 
   const onUpdate = typeof opts?.onUpdate === 'function' ? opts.onUpdate : null;

@@ -20,6 +20,7 @@ import { drawMatchesGroup, useVipOverlayForZoomPaint } from './zoom-target.js';
 import { bindGroupScreenSetting, filedUnderHtml, groupScreenSettingHtml, groupScreensHtml, groupsOnThisFrame } from './screens-ui.js';
 import { drawSelectionOverlay, enterZoomToGroup, filterViewToGroup } from './world-grid.js';
 import { clearPaintForGroup } from './paint-inventory-ui.js';
+import { groupPaintProgress, describePaintProgress } from '../../src/group-paint-progress.js';
 
 /** The tool's state and functions this part uses (tools/painter.js passes them in). */
 let ctx;
@@ -285,6 +286,15 @@ export function refreshAnimatedShadeRamps() {
   if (changed) ctx.markGroupsDirty();
 }
 
+/** "Paint: 271 of 326 tiles painted (83%)" with a bar, for a group that lists tiles (src/group-paint-progress.js). */
+function paintProgressHtml(g) {
+  const p = groupPaintProgress(g, ctx.pack);
+  const text = describePaintProgress(p);
+  if (!text) return '';
+  const pct = Math.floor((p.painted / p.total) * 100);
+  return `<div class="group-paint-progress" title="Tile patterns in this group that have colours (its own or the shared pack's). Pictures are not counted."><strong>Paint</strong>: ${text}<span class="paint-progress-bar" aria-hidden="true"><span style="width:${pct}%"></span></span></div>`;
+}
+
 export function updateGroupDetail(g) {
   if (!ctx.groupDetail) return;
   if (!g) {
@@ -339,6 +349,7 @@ export function updateGroupDetail(g) {
     ${touchUpOf(g) ? `<div style="font-size:0.72rem;margin-top:0.35rem;color:#f0b429"><strong>Touch-up</strong>: a ${touchUpOf(g).box.width}×${touchUpOf(g).box.height} patch painted over this group's tiles, shown only where the ${touchUpOf(g).layout.length} tiles around the anchor are arranged as when it was made. Painting here changes the tile colours everywhere; edit the touch-up in SpriteStudio.</div>` : ''}
     ${layerArtOf(g) ? `<div style="font-size:0.72rem;margin-top:0.35rem;color:var(--cyan)"><strong>Overpaint</strong>: a ${layerArtOf(g).width}×${layerArtOf(g).height} picture pinned to world ${layerArtOf(g).world}'s map, ${layerArtOf(g).hideTiles ? 'shown instead of the layer’s tiles' : 'painted over the group’s tiles'} wherever this group is on screen — it scrolls with the layer. Paint it in SpriteStudio.</div>` : ''}
     ${g.poseOverpaints?.length ? `<div style="font-size:0.72rem;margin-top:0.35rem;color:var(--cyan)" id="pose-overpaint-note"><strong>Pose overpaint</strong>: ${g.poseOverpaints.length} pose${g.poseOverpaints.length === 1 ? ' has' : 's have'} a picture of its own (${g.poseOverpaints.map((p) => ctx.escapeHtml(p.name || p.id)).join(', ')}), shown only when that whole pose is on screen. Paint them on the pose's card in SpriteStudio.</div>` : ''}
+    ${paintProgressHtml(g)}
     <div style="font-size:0.72rem;margin-top:0.35rem"><strong>Membership</strong>: <strong>${nHashes}</strong> hash(es) → <strong>${n}</strong> draw(s) on this eye${hasCopies ? ' <span style="color:var(--accent-warm)">(includes copies)</span>' : ''}</div>
     ${membershipNote}
     ${groupWorldsHtml(g)}

@@ -4,6 +4,8 @@
  */
 import { measureUncoloured, UNCOLOURED_FILTERS, describeUncoloured, uncolouredMasks, highlightUncoloured } from '../../src/uncoloured.js';
 import { changedPatterns, framePatterns, frameTouched } from '../../src/paint-change.js';
+import { savedCountFor } from '../../src/uncoloured-counts.js';
+import { frameTextLength, knownFramePatterns } from './frame-summaries.js';
 import { deserializeVIPState, validateVIPState } from '../../src/vip-dump.js';
 import { getCompositePixelInfo } from '../../src/color-layer.js';
 import { affineStandInDraws } from '../../src/affine-world.js';
@@ -50,12 +52,16 @@ export function loadVipFromJson(jsonStr) {
     ctx.clearVipAuthoringOverlay();
     clearSelection();
     ctx.v2Tile8VariantOverride = null;
-    ctx.selectedGroupId = null;
+    // The selected group stays selected from frame to frame (its outlines, its details, and the
+    // group New pose from selection offers first), as long as it still exists. Its view filter
+    // goes: on the next frame the tiles you want to add are the ones it would hide.
+    const kept = ctx.groups.find((g) => g.id === ctx.selectedGroupId) || null;
+    ctx.selectedGroupId = kept ? kept.id : null;
     ctx.viewGroupFilterId = null;
     syncV2VariantSelect();
     updateGroupsPanel();
     updatePoolSummary();
-    updateGroupDetail(null);
+    updateGroupDetail(kept);
     ctx.render();
     updatePaintV2TopButton();
     updateGroupsPoolContextHint();
@@ -319,6 +325,44 @@ export function applyFrameFilter(force = false) {
     showRecountProgress(0, 0);
   });
   return recounting.then(() => applyFrameFilter());
+}
+
+/**
+ * Start a newly opened pack from the counts saved with it (src/uncoloured-counts.js), when they
+ * were made with this paint and rules variant: frames with one are not counted again, and the
+ * patterns each shows come from its saved summary, so a later edit still recounts only the frames
+ * it can change. Call when the pack's paint is in place, before the frame list is filled.
+ * @param {{ variant: string, frames: Record<string, any> } | null | undefined} saved
+ */
+export function seedFrameCounts(saved) {
+  const into = { sig: paintSignature(), groupsSig: groupsSignature(), groups: ctx.groups, rows: [], list: [], shown: [] };
+  if (saved && saved.variant === (getActiveV2VariantId() ?? '')) {
+    ctx.availableFrames.forEach((row, i) => {
+      const m = row?.vipFile ? savedCountFor(saved, row.vipFile, frameTextLength(row)) : null;
+      if (!m) return;
+      into.rows[i] = row;
+      into.list[i] = m;
+      into.shown[i] = knownFramePatterns(ctx.loadedPackParts, row);
+    });
+  }
+  frameMeasure = into;
+}
+
+/**
+ * `{ uncolouredCounts }` for Save: every frame whose count is up to date with the paint being
+ * saved, or `{}` when none is (src/art-pack.js writes it with the paint's fingerprint).
+ */
+export function uncolouredCountsForSave() {
+  if (recounting || !frameMeasure.list.length || frameMeasure.sig !== paintSignature()) return {};
+  const stale = new Set(framesToRecount(false));
+  /** @type {Record<string, [number, number, number]>} */
+  const frames = {};
+  ctx.availableFrames.forEach((row, i) => {
+    const m = frameMeasure.list[i];
+    if (!m || stale.has(i) || !row?.vipFile || frameMeasure.rows[i] !== row) return;
+    frames[row.vipFile] = [frameTextLength(row), m.tiles, m.pixels];
+  });
+  return Object.keys(frames).length ? { uncolouredCounts: { variant: getActiveV2VariantId() ?? '', frames } } : {};
 }
 
 /** The frames the list shows, in order. */

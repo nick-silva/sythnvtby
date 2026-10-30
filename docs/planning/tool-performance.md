@@ -1,7 +1,7 @@
 ---
 status: partial
-last-reviewed: 2026-10-19
-covers: tools/painter.js, tools/painter/, src/paint-change.js, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/group-screens.js, src/color-layer.js, src/group-tile-colors.js, src/art-pack.js, src/zip-read.js, src/starter-paint.js, src/project-health.js, tests/e2e/s9-performance.mjs, src/lazy-entries.js, src/affine-world.js, src/memory-recorder.js, src/zip-write.js, tools/painter/pose-sources.js, src/pose-source-frames.js
+last-reviewed: 2026-10-21
+covers: tools/painter.js, tools/painter/, src/paint-change.js, src/uncoloured-counts.js, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/group-screens.js, src/color-layer.js, src/group-tile-colors.js, src/art-pack.js, src/zip-read.js, src/starter-paint.js, src/project-health.js, tests/e2e/s9-performance.mjs, src/lazy-entries.js, src/affine-world.js, src/memory-recorder.js, src/zip-write.js, tools/painter/pose-sources.js, src/pose-source-frames.js
 ---
 
 # Making the tools snappy at 250, 500 and 1000+ frames
@@ -134,6 +134,12 @@ frames… n / total" note, with `<` `>` disabled until done.
 Checked on the real pack: for ten groups across the game, an edit's skipped frames measured the
 same as a full recount (0 differences). Adding a one-tile Koopa pose and stepping: 11 s → 0.37 s.
 Groups whose tiles are on every match screen (court, net, scoreboard) still touch ~760 frames.
+
+**Oct 21:** Save keeps the counts in the pack (`uncoloured.json`, `src/uncoloured-counts.js`),
+stamped with a fingerprint of the colour entries written beside them; on open, frames with a
+count that still matches are not counted, and the patterns each shows come from its saved
+summary. Mario's Tennis (857 frames): opening with the Show filter on went from ~23 s of counting
+to none (2.5 s to open), with every count identical to a fresh one.
 
 ## Plan
 

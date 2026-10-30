@@ -1,6 +1,6 @@
 ---
 status: current
-last-reviewed: 2026-10-19
+last-reviewed: 2026-10-21
 covers: src/shared-tile-owner.js, src/pixel-explain.js, src/project-health.js, src/sub-state-learn.js, src/game-states.js, src/memory-questions.js, src/memory-recorder.js, src/memory-panel.js, src/poses-panel.js, src/frame-poses.js, src/project-storage.js, tools/painter/game-states-panel.js, tools/painter/storage-panel.js, src/screen-gate.js, src/group-order.js, tools/painter/health-panel.js, src/recovery.js, src/work-journal.js, index.html, src/main.js, src/frame-capture.js, src/auto-capture.js, src/frame-step.js, tools/index.html, tools/project.html, tools/painter.js, tools/painter/, tools/painter/sprite-profiles-ui.js, tools/sprite-studio.html, tools/sprite-studio.js, tools/sprite-studio/, tools/shared/pack-session.js, src/art-pack.js, src/group-folders.js, src/group-screens.js, src/layer-art.js, src/paint-gaps.js, src/project-journal.js, src/frame-numbers.js, src/starter-paint.js
 ---
 
@@ -275,7 +275,8 @@ it shows a lot of internals. Here is what matters.
     pose, say) only the frames that show that group's tiles are recounted, so the next `<` `>`
     is quick; a change that can reach every frame (painting, opening a pack, the first count)
     shows **Counting uncoloured frames… n / total** under the buttons, which wait until it
-    finishes. The frame you're on always stays in
+    finishes. **Save** keeps the counts in the pack, so opening it again doesn't count anything
+    (unless another tool, like SpriteStudio, saved new paint since). The frame you're on always stays in
     the list. A picture (overpaint) behind a tile doesn't count as colouring it: an unpainted
     character in front of a painted backdrop still counts.
   - **Highlight**, next to Show while a filter is on (or press **H**): marks what is missing on
@@ -332,7 +333,13 @@ it shows a lot of internals. Here is what matters.
   - The **Groups** tree, sorted by screen. Click a group to select it **and all of its tiles
     on this frame**. If the world or layer filter was hiding some of them, those worlds are
     turned on (added to what you had on, never replacing it) and the status line says so.
-    Its details and buttons appear under the tree.
+    Its details and buttons appear under the tree. The group **stays selected when you change
+    frames** (with `<` `>` or the Frame list), so **New pose from selection…** offers it first and
+    the brush keeps painting it; **Esc** or **Deselect** lets go. Its **Filter view** is turned
+    off on the new frame, so the tiles you are about to add stay visible.
+  - **How much of a group is painted.** Its details say "Paint: 271 of 326 tiles painted (83%)"
+    with a bar, and its row shows **83%** until every tile has colours. A tile counts once it
+    has colours of the group's own or the shared pack's; pictures (overpaint) are not counted.
   - **Which screens use a group.** A group's colours are not tied to a screen. They apply
     wherever its tiles appear, and the tree only files the group under the screen it was made
     on. So each row carries a pill based on your captured frames:

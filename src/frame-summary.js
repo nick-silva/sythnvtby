@@ -95,6 +95,21 @@ export function toPatternSummary(s) {
 }
 
 /**
+ * The patterns a summary says the frame shows to the left eye (non-blank draws, plus what its
+ * scaled layers show without a draw record — the latter for either eye, so a superset); null when
+ * the scaled layers' patterns were not worked out. What src/paint-change.js framePatterns gives
+ * for the decoded frame, or more.
+ * @returns {Set<number> | null}
+ */
+export function summaryPatterns(s) {
+  if (s.a && !Array.isArray(s.x)) return null;
+  const out = new Set();
+  for (const [hashes] of Object.values(s.w)) for (const h of hashes) out.add(Number(h) >>> 0);
+  if (s.a) for (const h of s.x) out.add(Number(h) >>> 0);
+  return out;
+}
+
+/**
  * The Project tool's screen-index form (src/group-screens.js frameGroupIndex): per world and layer,
  * and "any" of either, the patterns and tile slots the left eye draws there.
  * @returns {{ byWorldLayer: Map<string, { hashes: Set<number>, slots: Set<number> }> }}

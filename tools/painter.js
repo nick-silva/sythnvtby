@@ -288,6 +288,7 @@ import {
   frameFilter,
   loadVipFromJson,
   populateFrames,
+  seedFrameCounts,
   setFrameFilter,
   setFrameHighlight,
   shownFrameOptions,
@@ -1580,6 +1581,7 @@ initSave({
 
 initGroupsPanel({
   get currentState() { return currentState; },
+  get pack() { return pack; },
   get gameStatePools() { return gameStatePools; },
   get groups() { return groups; },
   get groupsTree() { return groupsTree; },
@@ -1875,6 +1877,9 @@ async function loadVbpackBuffer(buffer, label) {
     });
   }
 
+  // Counts saved with the pack for this paint, so the Show filter counts only frames without one.
+  v2Tile8VariantOverride = null;
+  seedFrameCounts(result.uncolouredCounts);
   populateFrames();
   rebuildScreenIndex();
   updateGroupsPanel();
@@ -2060,11 +2065,13 @@ function wireMenus() {
     updateFrameMenuState();
       clearSelection();
       v2Tile8VariantOverride = null;
-      selectedGroupId = null;
+      // The selected group stays selected across frames (see loadVipFromJson); its view filter goes.
+      const kept = groups.find((g) => g.id === selectedGroupId) || null;
+      selectedGroupId = kept ? kept.id : null;
       viewGroupFilterId = null;
       syncV2VariantSelect();
       updateGroupsPanel();
-      updateGroupDetail(null);
+      updateGroupDetail(kept);
       if (row?.json) {
         loadVipFromJson(row.json);
         reapplyPackVipAuthoringOverlaysFromLoadedPack();

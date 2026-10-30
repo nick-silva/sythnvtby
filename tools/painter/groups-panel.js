@@ -9,6 +9,7 @@ import { matchesGroupQuery } from '../../src/group-search.js';
 import { appendSharedGroupsSection, conditionPill, screenLimitPill, screensPill } from './screens-ui.js';
 import { behindPill, poolSummaryText } from './group-detail.js';
 import { classifyGroupsByPoolVariant, findDefaultPoolVariantForFrame, getCurrentFrameSelectIndex } from './pools.js';
+import { groupPaintProgress, describePaintProgress } from '../../src/group-paint-progress.js';
 
 /** The tool's state and functions this part uses (tools/painter.js passes them in). */
 let ctx;
@@ -69,6 +70,17 @@ function variantShouldBeOpen(poolId, variantId, snap, pi, vi, defaultPi, default
   return false;
 }
 
+/** "83%" on a group row while some of its tiles have no colours yet; none once all do (src/group-paint-progress.js). */
+function paintProgressPill(g) {
+  const p = groupPaintProgress(g, ctx.pack);
+  if (!p.total || p.painted >= p.total) return null;
+  const pill = document.createElement('span');
+  pill.className = 'screens-pill paint-progress-pill';
+  pill.textContent = `${Math.floor((p.painted / p.total) * 100)}%`;
+  pill.title = `${describePaintProgress(p)} — tile patterns with colours, its own or the shared pack's.`;
+  return pill;
+}
+
 /**
  * @param {typeof groups[0]} g
  */
@@ -100,6 +112,8 @@ export function createGroupRow(g) {
   if (when) row.appendChild(when);
   const behind = behindPill(g);
   if (behind) row.appendChild(behind);
+  const progress = paintProgressPill(g);
+  if (progress) row.appendChild(progress);
   if (layerArtOf(g)) {
     const opPill = document.createElement('span');
     opPill.className = 'screens-pill touch-up-pill overpaint-pill';

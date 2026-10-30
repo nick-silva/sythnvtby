@@ -872,6 +872,9 @@ await s.test('Move & scale drags the reference, and Revert puts it back', async 
 await s.test('Fill selection from reference paints the selected tiles', async () => {
   const button = '#btn-reference-fill-selection';
   await page.$eval('#frame-menu', (el) => { el.open = false; });
+  // A selected group stays selected across frames, and with the Fill tool on (left by the test
+  // above) a drag would fill it instead of selecting: let go of it first.
+  await page.click('#btn-deselect-group').catch(() => {});
   await page.click('#btn-clear-group-filter').catch(() => {});
   await unzoom();
   await page.selectOption('#layer-select', 'all');
@@ -2071,6 +2074,73 @@ await s.test('Groups: “On this frame” shows only the groups with tiles on th
   expect(pgErrors.length === 0, pgErrors.slice(0, 3).join(' | '));
   await pg.close();
   return `Title ${onTitle} · other ${onOther} · "${empty}"`;
+});
+
+await s.test('A selected group stays selected from frame to frame, and says how much of it is painted', async () => {
+  const pg = await context.newPage();
+  const { errors: pgErrors } = instrument(pg);
+  await openPainter(pg, PACK_ANNOTATED);
+  // A group with tiles on the frame on screen, so selecting it keeps the view as it is.
+  await pg.check('#group-on-frame');
+  await pg.waitForTimeout(300);
+  const name = await pg.$$eval('#groups-tree .group-row', (rs) => rs.find((r) => r.offsetParent !== null)?.lastElementChild?.textContent || '');
+  await pg.uncheck('#group-on-frame');
+  if (!name) return 'skipped — no group on the first frame';
+  await selectGroup(pg, name);
+  const state = () =>
+    pg.evaluate(() => ({
+      row: document.querySelector('#groups-tree .group-row.group-selected')?.lastElementChild?.textContent || null,
+      paint: (document.querySelector('.group-paint-progress')?.textContent || '').trim(),
+    }));
+  const first = await state();
+  const frameBefore = await pg.inputValue('#frame-select');
+  await pg.click('#btn-frame-next');
+  await pg.waitForTimeout(800);
+  const after = await state();
+  expect((await pg.inputValue('#frame-select')) !== frameBefore, 'the frame did not change');
+  expect(first.row === name && after.row === name, `selected: ${first.row} → ${after.row}`);
+  expect(/^Paint: (all \d+ tiles? painted|\d+ of \d+ tiles painted \(\d+%\))$/.test(after.paint), `paint line: "${after.paint}"`);
+  expect(pgErrors.length === 0, pgErrors.slice(0, 3).join(' | '));
+  await pg.close();
+  return `${name} · ${after.paint}`;
+});
+
+await s.test('Save keeps the Show filter’s counts: reopening the pack does not count the frames again', async () => {
+  const { PACK_PLAIN } = await import('./harness.mjs');
+  const counting = (pg) => pg.waitForFunction(() => !document.body.classList.contains('frame-counting'), null, { timeout: 120000 });
+  const listed = (pg) => pg.$$eval('#frame-select option', (os) => os.map((o) => `${o.hidden ? '-' : '+'}${o.textContent}`));
+  const pg = await context.newPage();
+  const { errors: pgErrors } = instrument(pg);
+  await openPainter(pg, PACK_PLAIN);
+  await pg.selectOption('#frame-filter', 'tiles');
+  await pg.waitForTimeout(100);
+  await counting(pg);
+  const counted = await listed(pg);
+  const saved = `${OUT}/s2-uncoloured-counts.vbpack`;
+  await painterSave(pg, saved);
+  const parsed = await parseArtPack((await readFile(saved)).buffer);
+  const n = Object.keys(parsed.uncolouredCounts?.frames || {}).length;
+  await pg.close();
+  // Reopen: the filter is remembered, and the counts come from the pack — no counting note.
+  const again = await context.newPage();
+  const { errors: againErrors } = instrument(again);
+  await again.addInitScript(() => {
+    window.__counted = 0;
+    new MutationObserver(() => {
+      if (document.getElementById('frame-count-busy')?.hidden === false) window.__counted++;
+    }).observe(document, { subtree: true, attributes: true });
+  });
+  await openPainter(again, saved);
+  await counting(again);
+  const reopened = await listed(again);
+  const busy = await again.evaluate(() => window.__counted);
+  await again.selectOption('#frame-filter', 'all');
+  await again.close();
+  expect(n > 0, 'the saved pack has no uncoloured counts');
+  expect(busy === 0, `reopening counted again (${busy} progress update(s))`);
+  expect(reopened.length === counted.length && reopened.every((t, i) => t === counted[i]), 'the reopened counts differ from the ones saved');
+  expect(pgErrors.length + againErrors.length === 0, [...pgErrors, ...againErrors].slice(0, 3).join(' | '));
+  return `${n} frame count(s) saved · reopened without counting`;
 });
 
 await s.test('No page errors during the painter run', async () => {

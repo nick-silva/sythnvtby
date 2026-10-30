@@ -720,6 +720,11 @@
     .screens-pill.screens-none { border-style: dashed; }
     .screens-pill.touch-up-pill { border-color: #f0b429; color: #f0b429; }
     .screens-pill.screen-limit-pill { border-color: var(--accent-warm); color: var(--accent-warm); }
+    /* How much of a group is painted (tools/painter/groups-panel.js, group-detail.js). */
+    .screens-pill.paint-progress-pill { font-family: var(--font-mono); }
+    .group-paint-progress { font-size: 0.72rem; margin-top: 0.35rem; }
+    .paint-progress-bar { display: block; height: 4px; margin-top: 0.2rem; border-radius: 2px; background: var(--border-strong); overflow: hidden; }
+    .paint-progress-bar > span { display: block; height: 100%; background: var(--cyan); }
     .shared-pool > summary { color: var(--accent-warm); }
 
     .bottom-strip {
